@@ -281,6 +281,12 @@
     if (max !== null) query = query.lte("price_inr", max);
     
     
+
+    // NEW: Apply fabric filter (expects products.fabric to store values like "silk", "cotton", etc.)
+    if (selectedFabrics.length) {
+      query = query.in("fabric", selectedFabrics);
+    }
+
     // NEW: Apply stock filter
     if (inStockOnly) {
       query = query.gt("inventory_qty", 0);

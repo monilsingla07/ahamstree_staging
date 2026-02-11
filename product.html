@@ -85,6 +85,22 @@
           <div class="card" style="margin-top:14px;padding:16px;border-radius:16px;">
             <div id="sections"></div>
           </div>
+
+          <!-- Return request (new) -->
+          <div class="card" style="margin-top:14px;padding:16px;border-radius:16px;">
+            <div style="font-weight:900;font-size:16px;">Returns / Exchange</div>
+            <div class="small" style="margin-top:6px;opacity:.8;">
+              If you have already received this product and want to request a return, you can submit a request here.
+              Please keep your Order ID handy.
+            </div>
+
+            <div id="returnBox" style="margin-top:12px;"></div>
+
+            <div class="small" style="margin-top:10px;opacity:.75;">
+              Read our policy: <a href="returns.html">Returns</a>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -278,6 +294,14 @@
       qtyMinus.addEventListener("click", () => setQty(getQty() - 1));
       qtyPlus.addEventListener("click", () => setQty(getQty() + 1));
 
+      // If sold out, disable qty controls completely
+      if (inv <= 0) {
+        qtyInput.disabled = true;
+        qtyMinus.disabled = true;
+        qtyPlus.disabled = true;
+      }
+
+
       // ===== Fetch & render specs =====
       const { data: specs, error: specsErr } = await supabase
         .from("product_specs")
@@ -389,6 +413,60 @@
         });
 
         // initial state
+
+      // ===== Return request (simple) =====
+      const returnBox = document.getElementById("returnBox");
+      if (returnBox) {
+        const { data: sess } = await supabase.auth.getSession();
+        const user = sess?.session?.user;
+
+        if (!user) {
+          const next = encodeURIComponent(`product.html?id=${data.id}`);
+          returnBox.innerHTML = `
+            <div class="small">
+              Please <a href="login.html?next=${next}">log in</a> to request a return.
+            </div>
+          `;
+        } else {
+          returnBox.innerHTML = `
+            <div style="display:grid;gap:10px;">
+              <input id="retOrderId" class="input" placeholder="Your Order ID (required)" />
+              <textarea id="retReason" class="input" rows="3" placeholder="Reason (required)"></textarea>
+              <button id="retSubmit" class="btn secondary" type="button">Submit return request</button>
+              <div id="retStatus" class="small"></div>
+            </div>
+          `;
+
+          const retStatus = document.getElementById("retStatus");
+          document.getElementById("retSubmit").onclick = async () => {
+            retStatus.textContent = "";
+            const orderId = String(document.getElementById("retOrderId").value || "").trim();
+            const reason = String(document.getElementById("retReason").value || "").trim();
+
+            if (!orderId) return (retStatus.textContent = "Please enter your Order ID.");
+            if (!reason || reason.length < 5) return (retStatus.textContent = "Please add a short reason (min 5 chars).");
+
+            retStatus.textContent = "Submitting…";
+
+            // NOTE: You will create the return_requests table + RLS policy (SQL shared in my response).
+            const { error: retErr } = await supabase.from("return_requests").insert({
+              order_id: orderId,
+              product_id: data.id,
+              reason,
+              status: "requested"
+            });
+
+            if (retErr) {
+              retStatus.textContent = "Error: " + retErr.message;
+            } else {
+              retStatus.textContent = "Return request submitted ✅ We will contact you soon.";
+              document.getElementById("retOrderId").value = "";
+              document.getElementById("retReason").value = "";
+            }
+          };
+        }
+      }
+
         await syncWishlistButton();
       }
 

@@ -147,6 +147,17 @@
       <div id="newCollectionGrid" class="grid grid-3"></div>
     </section>
 
+
+    <!-- Testimonials -->
+    <section class="section">
+      <div class="section-head">
+        <h2 class="section-title">Testimonials</h2>
+      </div>
+
+      <div id="testimonialsGrid" class="grid grid-3"></div>
+    </section>
+
+
   </div>
 
   <!-- Floating CTA (WhatsApp-like) -->
@@ -167,6 +178,34 @@
 
     // Home page dynamic sections
     hydrateHome();
+
+    // Testimonials (static for now)
+    const testimonials = [
+      { quote: "Beautiful weave and the saree looked even better in person. Packaging was premium.", name: "Ananya", place: "Bengaluru", stars: 5 },
+      { quote: "Fast delivery and super helpful support on WhatsApp. Loved the fabric quality.", name: "Ritika", place: "Delhi", stars: 5 },
+      { quote: "Exactly as shown. The drape is gorgeous and the blouse piece was perfect.", name: "Meera", place: "Mumbai", stars: 5 },
+      { quote: "Great gifting experience. My mom loved it and asked for another one!", name: "Kavya", place: "Pune", stars: 5 },
+      { quote: "Elegant and lightweight. Perfect for functions and easy to carry.", name: "Sonia", place: "Hyderabad", stars: 5 },
+      { quote: "The craftsmanship is excellent. Will definitely order again.", name: "Priya", place: "Chandigarh", stars: 5 },
+    ];
+
+    const stars = (n) => "★★★★★".slice(0, Math.max(0, Math.min(5, Number(n || 0))));
+
+    const tGrid = document.getElementById("testimonialsGrid");
+    if (tGrid) {
+      tGrid.innerHTML = testimonials.map(t => `
+        <div class="card testimonial-card">
+          <div class="testimonial-stars small">${stars(t.stars)}</div>
+          <div class="testimonial-quote" style="margin-top:10px;">“${t.quote}”</div>
+          <div class="testimonial-meta">
+            <div class="testimonial-name">${t.name}</div>
+            <div class="small">${t.place}</div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+
 
     // Simple hero carousel (no dependencies)
     const track = document.querySelector(".hero-track");

@@ -40,8 +40,10 @@
 
       <div class="small" style="margin-top:10px;">Shipping + Razorpay payment link comes in checkout.</div>
 
+<div id="stockMsg" class="small" style="margin-top:8px;color:crimson;display:none;"></div>
+
       <div class="row" style="margin-top:14px;">
-        <a class="btn" href="checkout.html">Checkout</a>
+        <a id="checkoutBtn" class="btn" href="checkout.html">Checkout</a>
         <button id="clearBtn" class="btn secondary" type="button">Clear cart</button>
       </div>
     </div>
@@ -51,13 +53,44 @@
 
   <script type="module">
   import { renderHeader, renderFooter, hydrateHeaderAuth } from "./assets/ui.js";
+  import { supabase } from "./assets/supabase.js";
   import { getCart, updateQty, removeFromCart, clearCart } from "./assets/cart.js";
 
   function money(n) {
-    return "₹" + n;
+    const num = Number(n || 0);
+    return "₹" + num.toLocaleString("en-IN", { maximumFractionDigits: 0 });
   }
 
-  function render() {
+  // small cache to avoid re-fetching product rows on every qty click
+  const cache = { key: "", ts: 0, map: new Map() };
+
+  async function getProductMap(productIds) {
+    const ids = (productIds || []).map(String);
+    ids.sort();
+    const key = ids.join(",");
+    const now = Date.now();
+
+    if (cache.key === key && (now - cache.ts) < 30000) return cache.map;
+
+    const { data, error } = await supabase
+      .from("products")
+      .select("id,title,price_inr,sale_price_inr,inventory_qty,is_active, product_images(image_url, sort_order)")
+      .in("id", ids);
+
+    const map = new Map();
+    (data || []).forEach(p => map.set(String(p.id), p));
+
+    cache.key = key;
+    cache.ts = now;
+    cache.map = map;
+
+    // If we cannot fetch, return an empty map (cart will still render but checkout will be disabled)
+    if (error) console.error("Cart stock fetch error:", error);
+
+    return map;
+  }
+
+  async function render() {
     document.getElementById("header").innerHTML = renderHeader("cart");
     document.getElementById("footer").innerHTML = renderFooter();
     hydrateHeaderAuth();
@@ -66,6 +99,8 @@
     const empty = document.getElementById("empty");
     const list = document.getElementById("list");
     const summary = document.getElementById("summary");
+    const stockMsg = document.getElementById("stockMsg");
+    const checkoutBtn = document.getElementById("checkoutBtn");
 
     if (!items.length) {
       empty.style.display = "block";
@@ -77,53 +112,127 @@
     empty.style.display = "none";
     summary.style.display = "block";
 
+    // Load latest product data (price + stock)
+    const ids = items.map(i => i.product_id);
+    const pMap = await getProductMap(ids);
+
     let subtotal = 0;
+    let issues = [];
+
     let html = "";
 
-    items.forEach((i) => {
-      subtotal += i.price_inr * i.qty;
+    for (const i of items) {
+      const p = pMap.get(String(i.product_id));
+      const active = p?.is_active !== false;
+      const inv = Number(p?.inventory_qty ?? 0);
+
+      const unitPrice = Number(
+        (p?.sale_price_inr && p?.sale_price_inr > 0 && p?.sale_price_inr < p?.price_inr)
+          ? p.sale_price_inr
+          : (p?.price_inr ?? i.price_inr ?? 0)
+      );
+
+      const title = p?.title || i.title || "Item";
+
+      // choose image
+      const imgUrl = (() => {
+        const imgs = (p?.product_images ?? []).slice().sort((a,b)=> (a.sort_order??0)-(b.sort_order??0));
+        return imgs[0]?.image_url || i.image_url || "";
+      })();
+
+      // availability
+      const available = (!!p && active) ? inv : 0;
+      const max = Math.min(99, Math.max(0, available));
+      let qty = Number(i.qty || 1);
+
+      // If user has more qty than available stock, keep cart but block checkout.
+      if (max > 0 && qty > max) {
+        issues.push(`${title}: only ${max} left`);
+        // Clamp locally so the cart UI becomes valid again
+        updateQty(i.product_id, max);
+        qty = max;
+      }
+
+      const soldOut = (max === 0);
+      if (soldOut) issues.push(`${title}: sold out`);
+
+      const lineTotal = unitPrice * qty;
+      subtotal += lineTotal;
 
       html +=
         '<div class="card" style="padding:12px;border-radius:14px;display:flex;gap:12px;margin-bottom:12px;">' +
           '<div style="width:72px;height:90px;border-radius:12px;overflow:hidden;background:#fafafa;">' +
-            (i.image_url
-              ? '<img src="' + i.image_url + '" alt="' + i.title + '" style="width:100%;height:100%;object-fit:cover;">'
+            (imgUrl
+              ? '<img src="' + imgUrl + '" alt="' + title + '" style="width:100%;height:100%;object-fit:cover;">'
               : ''
             ) +
           '</div>' +
-          '<div style="flex:1;">' +
-            '<div style="font-weight:900;">' + i.title + '</div>' +
-            '<div style="margin-top:6px;opacity:.85;">' + money(i.price_inr) + '</div>' +
+          '<div style="flex:1;min-width:0;">' +
+            '<div style="font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + title + '</div>' +
+            '<div style="margin-top:6px;opacity:.85;">' + money(unitPrice) + '</div>' +
+            (soldOut ? '<div class="small" style="margin-top:6px;color:crimson;">Sold out</div>' : '') +
+            (!soldOut && max > 0 ? '<div class="small" style="margin-top:6px;opacity:.75;">Available: ' + max + '</div>' : '') +
             '<div class="row" style="margin-top:10px;">' +
               '<span class="small">Qty</span>' +
-              '<input class="qty input" data-id="' + i.product_id + '" style="width:90px;" type="number" min="1" max="99" value="' + i.qty + '">' +
+              '<input class="qty input" data-max="' + max + '" data-id="' + i.product_id + '" style="width:90px;" type="number" min="1" max="' + (max || 1) + '" value="' + qty + '" ' + (soldOut ? "disabled" : "") + '>' +
               '<button class="remove btn secondary" data-id="' + i.product_id + '" type="button">Remove</button>' +
             '</div>' +
           '</div>' +
-          '<div style="font-weight:900;">' + money(i.price_inr * i.qty) + '</div>' +
+          '<div style="font-weight:900;flex:0 0 auto;">' + money(lineTotal) + '</div>' +
         '</div>';
-    });
+    }
 
     list.innerHTML = html;
     document.getElementById("subtotal").textContent = money(subtotal);
 
+    // Show stock issues & disable checkout if needed
+    if (stockMsg) {
+      if (issues.length) {
+        stockMsg.style.display = "block";
+        stockMsg.textContent = "Please fix: " + issues.join(" • ");
+      } else {
+        stockMsg.style.display = "none";
+        stockMsg.textContent = "";
+      }
+    }
+
+    if (checkoutBtn) {
+      if (issues.length) {
+        checkoutBtn.classList.add("is-disabled");
+        checkoutBtn.setAttribute("aria-disabled", "true");
+        checkoutBtn.title = "Fix sold out / stock issues first";
+      } else {
+        checkoutBtn.classList.remove("is-disabled");
+        checkoutBtn.removeAttribute("aria-disabled");
+        checkoutBtn.title = "";
+      }
+    }
+
     document.querySelectorAll(".qty").forEach((inp) => {
-      inp.addEventListener("change", (e) => {
-        updateQty(e.target.dataset.id, e.target.value);
-        render();
+      inp.addEventListener("change", async (e) => {
+        const id = e.target.dataset.id;
+        const max = Number(e.target.dataset.max || 99);
+        let v = Number(e.target.value || 1);
+        if (!Number.isFinite(v) || v < 1) v = 1;
+        if (max > 0 && v > max) v = max;
+        e.target.value = v;
+
+        updateQty(id, v);
+        // re-render (will reuse cache)
+        await render();
       });
     });
 
     document.querySelectorAll(".remove").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
+      btn.addEventListener("click", async (e) => {
         removeFromCart(e.target.dataset.id);
-        render();
+        await render();
       });
     });
 
-    document.getElementById("clearBtn").onclick = () => {
+    document.getElementById("clearBtn").onclick = async () => {
       clearCart();
-      render();
+      await render();
     };
   }
 

@@ -47,7 +47,7 @@
       <div class="small" style="color:crimson;" id="warnText"></div>
     </div>
 
-    <div style="display:grid; grid-template-columns: 1.4fr .9fr; gap:16px; align-items:start;" class="checkout-grid">
+    <div class="checkout-grid">
 
       <!-- LEFT: Shipping -->
       <form id="form" class="card" style="padding:16px; border-radius:16px;">
@@ -112,12 +112,32 @@
 
         <div id="summaryItems" style="display:flex; flex-direction:column; gap:10px;"></div>
 
+        <!-- Coupon -->
+        <div id="couponBox" style="margin-top:12px;">
+          <div class="small" style="font-weight:800;">Coupon</div>
+          <div class="row" style="margin-top:8px; gap:10px;">
+            <input id="couponInput" class="input" placeholder="Enter code (e.g., WELCOME10)" style="flex:1;" />
+            <button id="applyCoupon" type="button" class="btn secondary" style="height:40px;">Apply</button>
+          </div>
+          <div id="couponMsg" class="small" style="margin-top:6px; opacity:.85;"></div>
+        </div>
+
+
         <div style="height:12px;"></div>
         <div style="border-top:1px solid rgba(255,255,255,.08); padding-top:12px;">
           <div style="display:flex; justify-content:space-between; gap:10px;">
             <div class="small">Subtotal</div>
             <div class="small" id="subtotal">₹0</div>
           </div>
+          <div id="discountRow" style="display:none; justify-content:space-between; gap:10px; margin-top:6px;">
+            <div class="small">Discount</div>
+            <div class="small" id="discount">-₹0</div>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px; margin-top:6px;">
+            <div class="small" id="gstLabel">GST</div>
+            <div class="small" id="gst">₹0</div>
+          </div>
+
           <div style="display:flex; justify-content:space-between; gap:10px; margin-top:6px;">
             <div class="small">Shipping</div>
             <div class="small" id="shipping">₹0</div>
@@ -155,46 +175,159 @@
     };
 
     // ---------- Money / Summary ----------
+
+    // NOTE:
+    // - Coupons + exact totals should be calculated on the server (Edge Function) to prevent misuse.
+    // - Until you deploy the optional `quote-order` Edge Function, the checkout will still work,
+    //   but coupon applying will show a message.
+
+    const GST_RATE = 0.05; // 5% GST. Change if your GST rate is different.
+    const GST_INCLUDED_IN_PRICE = true; // Your product page says "inclusive of all taxes"
+
+    let cartOk = true; // used to disable Pay if stock is not available
+    let appliedCoupon = localStorage.getItem("ahamstree_coupon") || "";
+
     function money(n) {
-      return "₹" + Number(n || 0);
+      const num = Number(n || 0);
+      return "₹" + num.toLocaleString("en-IN", { maximumFractionDigits: 0 });
     }
 
-    async function renderOrderSummary() {
+    function calcGST(netTotal) {
+      const rate = Number(GST_RATE || 0);
+      const net = Number(netTotal || 0);
+
+      if (!rate || rate <= 0) return { gst: 0, taxable: net };
+
+      if (GST_INCLUDED_IN_PRICE) {
+        const taxable = net / (1 + rate);
+        const gst = net - taxable;
+        return { gst, taxable };
+      }
+
+      const gst = net * rate;
+      return { gst, taxable: net };
+    }
+
+    async function tryServerQuote({ cart, coupon_code }) {
+      try {
+        const sbMod = await import("./assets/supabase.js");
+
+        // OPTIONAL edge function (you will add later):
+        // - If it doesn't exist yet, this will fail and we will just fall back.
+        const { data, error } = await sbMod.supabase.functions.invoke("quote-order", {
+          body: { cart, coupon_code }
+        });
+
+        if (error) return { ok: false, error: error.message || "Quote error" };
+        if (!data) return { ok: false, error: "No quote returned" };
+        return { ok: true, data };
+      } catch (e) {
+        return { ok: false, error: String(e?.message ?? e) };
+      }
+    }
+
+    async function renderOrderSummary({ coupon_code = "" } = {}) {
       const summaryItems = document.getElementById("summaryItems");
       const subtotalEl = document.getElementById("subtotal");
       const shippingEl = document.getElementById("shipping");
       const totalEl = document.getElementById("total");
 
+      const discountRow = document.getElementById("discountRow");
+      const discountEl = document.getElementById("discount");
+      const gstEl = document.getElementById("gst");
+      const gstLabel = document.getElementById("gstLabel");
+
+      const couponInput = document.getElementById("couponInput");
+      const couponMsg = document.getElementById("couponMsg");
+
       if (!summaryItems || !subtotalEl || !shippingEl || !totalEl) return;
 
       const cartMod = await import("./assets/cart.js");
+      const sbMod = await import("./assets/supabase.js");
+
       const items = cartMod.getCart?.() || [];
+      cartOk = true;
+
+      if (couponInput && coupon_code !== undefined) {
+        couponInput.value = String(coupon_code || "");
+      }
 
       if (!items.length) {
         summaryItems.innerHTML = `<div class="small" style="opacity:.75;">Your cart is empty.</div>`;
         subtotalEl.textContent = money(0);
         shippingEl.textContent = money(0);
         totalEl.textContent = money(0);
+        if (discountRow) discountRow.style.display = "none";
+        if (gstEl) gstEl.textContent = money(0);
+        if (gstLabel) gstLabel.textContent = GST_INCLUDED_IN_PRICE ? "GST (included)" : "GST";
+        if (couponMsg) couponMsg.textContent = "";
+        cartOk = false;
+        validateAll({ showErrors: false });
         return;
       }
 
+      // Fetch latest product info (stock + price)
+      const ids = Array.from(new Set(items.map(i => String(i.product_id))));
+      const { data: products, error: prodErr } = await sbMod.supabase
+        .from("products")
+        .select("id,title,price_inr,sale_price_inr,inventory_qty,is_active, product_images(image_url, sort_order)")
+        .in("id", ids);
+
+      if (prodErr) {
+        // If product fetch fails, do not allow payment
+        cartOk = false;
+        showError("Could not verify product stock. Please refresh and try again.");
+      }
+
+      const pMap = new Map((products || []).map(p => [String(p.id), p]));
+
       let subtotal = 0;
+      let hasStockIssue = false;
 
       summaryItems.innerHTML = items.map((i) => {
-        const lineTotal = (i.price_inr || 0) * (i.qty || 1);
+        const pid = String(i.product_id);
+        const p = pMap.get(pid);
+
+        const active = p?.is_active !== false;
+        const inv = Number(p?.inventory_qty ?? 0);
+        const qty = Number(i.qty || 1);
+
+        const okStock = !!p && active && inv > 0 && qty <= inv;
+        if (!okStock) hasStockIssue = true;
+
+        const unitPrice = Number(
+          (p?.sale_price_inr && p?.sale_price_inr > 0 && p?.sale_price_inr < p?.price_inr)
+            ? p.sale_price_inr
+            : (p?.price_inr ?? i.price_inr ?? 0)
+        );
+
+        const lineTotal = unitPrice * qty;
         subtotal += lineTotal;
+
+        const imgUrl = (() => {
+          const imgs = (p?.product_images ?? []).slice().sort((a,b)=> (a.sort_order??0)-(b.sort_order??0));
+          return imgs[0]?.image_url || i.image_url || "";
+        })();
+
+        const title = p?.title || i.title || "Item";
+
+        let stockText = "";
+        if (!p) stockText = "Unavailable";
+        else if (!active || inv <= 0) stockText = "Sold out";
+        else if (qty > inv) stockText = `Only ${inv} left`;
 
         return `
           <div style="display:flex; gap:10px; align-items:center;">
             <div style="width:54px;height:64px;border-radius:12px;overflow:hidden;background:#fafafa;flex:0 0 auto;">
-              ${i.image_url ? `<img src="${i.image_url}" alt="${i.title || ""}" style="width:100%;height:100%;object-fit:cover;">` : ""}
+              ${imgUrl ? `<img src="${imgUrl}" alt="${title}" style="width:100%;height:100%;object-fit:cover;">` : ""}
             </div>
 
             <div style="flex:1; min-width:0;">
               <div style="font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                ${i.title || "Item"}
+                ${title}
               </div>
-              <div class="small" style="opacity:.75;">₹${i.price_inr} × ${i.qty}</div>
+              <div class="small" style="opacity:.75;">${money(unitPrice)} × ${qty}</div>
+              ${stockText ? `<div class="small" style="color:crimson; margin-top:2px;">${stockText}</div>` : ""}
             </div>
 
             <div style="font-weight:900; flex:0 0 auto;">${money(lineTotal)}</div>
@@ -202,12 +335,67 @@
         `;
       }).join("");
 
-      const shipping = 0; // keep free for now
-      const total = subtotal + shipping;
+      if (hasStockIssue) {
+        cartOk = false;
+        showError("Some items are sold out / exceed available stock. Please go back and edit your cart.");
+      } else {
+        clearError();
+      }
+
+      const shipping = 0; // free shipping for now
+
+      // Default client-side totals
+      let discount = 0;
+      let gst = calcGST(subtotal - discount + shipping).gst;
+
+      // If coupon exists, try server-side quote (recommended)
+      const code = String(coupon_code || "").trim();
+      const payloadCart = items.map(i => ({ product_id: i.product_id, qty: i.qty }));
+
+      if (code) {
+        const q = await tryServerQuote({ cart: payloadCart, coupon_code: code });
+
+        if (q.ok && q.data?.quote) {
+          const qt = q.data.quote;
+          subtotal = Number(qt.subtotal_inr ?? subtotal);
+          discount = Number(qt.discount_inr ?? 0);
+          gst = Number(qt.gst_inr ?? gst);
+
+          if (couponMsg) {
+            couponMsg.textContent = qt.coupon_applied ? `Applied: ${code}` : (q.data?.message || "Coupon not applied");
+          }
+        } else {
+          if (couponMsg) {
+            couponMsg.textContent = "Coupon will work after you deploy the `quote-order` Edge Function.";
+          }
+        }
+      } else {
+        if (couponMsg) couponMsg.textContent = "";
+      }
+
+      if (gstLabel) gstLabel.textContent = GST_INCLUDED_IN_PRICE ? "GST (included)" : "GST";
+      if (gstEl) gstEl.textContent = money(gst);
+
+      if (discountRow && discountEl) {
+        if (discount > 0) {
+          discountRow.style.display = "flex";
+          discountEl.textContent = "-" + money(discount);
+        } else {
+          discountRow.style.display = "none";
+          discountEl.textContent = "-" + money(0);
+        }
+      }
+
+      // Total: if GST is included, don't add it again
+      const total = GST_INCLUDED_IN_PRICE
+        ? (subtotal - discount + shipping)
+        : (subtotal - discount + shipping + gst);
 
       subtotalEl.textContent = money(subtotal);
       shippingEl.textContent = money(shipping);
       totalEl.textContent = money(total);
+
+      validateAll({ showErrors: false });
     }
 
     // ---------- Validation ----------
@@ -317,16 +505,17 @@
         }
       });
 
-      payBtn.disabled = !allOk;
-      payBtn.style.opacity = allOk ? "1" : "0.6";
-      payBtn.style.cursor = allOk ? "pointer" : "not-allowed";
+      const canPay = allOk && cartOk;
+      payBtn.disabled = !canPay;
+      payBtn.style.opacity = canPay ? "1" : "0.6";
+      payBtn.style.cursor = canPay ? "pointer" : "not-allowed";
 
       if (showErrors) {
         if (!allOk && firstError) showError(firstError);
         else clearError();
       }
 
-      return allOk;
+      return (allOk && cartOk);
     };
 
     const attachLiveValidation = () => {
@@ -386,8 +575,31 @@
     };
 
     // ---------- Init ----------
-    statusEl.textContent = "✅ Checkout JS loaded";
-    renderOrderSummary();
+    statusEl.textContent = "";
+
+    // Coupon UI
+    const couponInput = document.getElementById("couponInput");
+    const applyCouponBtn = document.getElementById("applyCoupon");
+
+    if (couponInput) couponInput.value = appliedCoupon;
+
+    const applyCouponNow = async () => {
+      const code = String(couponInput?.value || "").trim().toUpperCase();
+      appliedCoupon = code;
+      localStorage.setItem("ahamstree_coupon", appliedCoupon);
+      await renderOrderSummary({ coupon_code: appliedCoupon });
+    };
+
+    applyCouponBtn?.addEventListener("click", applyCouponNow);
+    couponInput?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        applyCouponNow();
+      }
+    });
+
+    // First render
+    renderOrderSummary({ coupon_code: appliedCoupon });
     attachLiveValidation();
     validateAll({ showErrors: false });
 
@@ -431,7 +643,7 @@
         const payloadCart = cart.map(i => ({ product_id: i.product_id, qty: i.qty }));
 
         const { data, error } = await sbMod.supabase.functions.invoke("create-payment-link", {
-          body: { cart: payloadCart, shipping, customer }
+          body: { cart: payloadCart, shipping, customer, coupon_code: (appliedCoupon || null) }
         });
 
         if (error || !data?.payment_link_url) {
