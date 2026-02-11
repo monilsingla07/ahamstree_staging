@@ -1,0 +1,400 @@
+<!doctype html>
+<html>
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CKQ1EXBHY6"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-CKQ1EXBHY6');
+  </script>
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Product — AhamStree</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+
+<body>
+  <div id="header"></div>
+
+  <div class="container">
+    <a href="products.html">← Back to products</a>
+    <div id="status" class="small" style="margin-top:12px;">Loading…</div>
+
+    <div id="content" style="display:none;">
+      <!-- Nalli-style: left gallery, right details -->
+      <div class="pd-wrap">
+        <!-- LEFT: Thumbs + main image -->
+        <div class="pd-left card" style="border-radius:16px; padding: 12px;">
+          <div class="pd-gallery">
+            <div id="thumbs" class="pd-thumbs"></div>
+
+            <div class="pd-main">
+              <img id="mainImg" alt="" />
+            </div>
+          </div>
+          <div class="small" style="margin-top:10px; opacity:.7;">Click image to zoom</div>
+        </div>
+
+        <!-- RIGHT: Details -->
+        <div class="pd-right">
+          <div class="card" style="padding:16px;border-radius:16px;">
+            <div id="title" class="pd-title"></div>
+
+            <div class="pd-meta">
+              <div id="sku" class="small"></div>
+              <div id="stock" class="small"></div>
+            </div>
+
+            <div class="pd-price-row">
+              <div id="price" class="pd-price"></div>
+              <div id="taxNote" class="pd-tax small">Inclusive of all taxes</div>
+            </div>
+
+            <div class="pd-actions">
+              <div class="pd-qty">
+                <span class="small">Qty</span>
+                <div class="pd-qty-box">
+                  <button id="qtyMinus" type="button" class="pd-qty-btn">−</button>
+                  <input id="qtyInput" class="pd-qty-input" value="1" inputmode="numeric" />
+                  <button id="qtyPlus" type="button" class="pd-qty-btn">+</button>
+                </div>
+              </div>
+
+              <button id="addBtn" class="btn pd-add">Add to cart</button>
+              <button id="wishBtn" type="button" class="btn secondary pd-wish">♡ Wishlist</button>
+              <a class="btn secondary pd-go" href="cart.html">Go to cart</a>
+            </div>
+
+            <div id="desc" class="pd-desc"></div>
+          </div>
+
+          <!-- Specs -->
+          <div class="card" style="margin-top:14px;padding:16px;border-radius:16px;">
+            <div style="font-weight:900;font-size:16px;">Specifications</div>
+            <div id="specs" style="margin-top:10px;"></div>
+          </div>
+
+          <!-- Sections / Accordion -->
+          <div class="card" style="margin-top:14px;padding:16px;border-radius:16px;">
+            <div id="sections"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lightbox -->
+  <div id="lightbox" aria-hidden="true">
+    <div id="lightboxInner">
+      <img id="lightboxImg" alt="Product image enlarged" />
+      <button id="lbClose" class="lb-btn" type="button">✕</button>
+      <button id="lbPrev" class="lb-btn" type="button">‹</button>
+      <button id="lbNext" class="lb-btn" type="button">›</button>
+    </div>
+  </div>
+
+  <div id="footer"></div>
+
+  <script type="module">
+    import { renderHeader, renderFooter, hydrateHeaderAuth } from "./assets/ui.js";
+    import { supabase } from "./assets/supabase.js";
+    import { addToCart } from "./assets/cart.js";
+    import { addToWishlist, removeFromWishlist, isInWishlist } from "./assets/wishlist.js";
+
+    document.getElementById("header").innerHTML = renderHeader("products");
+    document.getElementById("footer").innerHTML = renderFooter();
+    hydrateHeaderAuth();
+
+    const params = new URLSearchParams(location.search);
+    const id = params.get("id");
+
+    function safeNum(v, fallback = 0) {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
+    }
+
+    function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+
+    async function loadProduct() {
+      const status = document.getElementById("status");
+
+      if (!id) {
+        status.textContent = "Product not found.";
+        return;
+      }
+
+      // 1) Product + images (you already had this)
+      const { data, error } = await supabase
+        .from("products")
+        .select("id,title,description,price_inr,sale_price_inr,sku,inventory_qty,is_active, product_images(image_url, sort_order, alt_text)")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (error || !data) {
+        status.textContent = "Product not found.";
+        return;
+      }
+
+      const images = (data.product_images ?? [])
+        .slice()
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+
+      const main = images[0]?.image_url ?? "";
+
+      // Show page
+      document.getElementById("status").style.display = "none";
+      document.getElementById("content").style.display = "block";
+
+      // Basic fields
+      document.getElementById("title").textContent = data.title ?? "";
+      document.getElementById("desc").textContent = data.description ?? "";
+
+      const skuEl = document.getElementById("sku");
+      skuEl.textContent = data.sku ? `SKU: ${data.sku}` : "";
+
+      const inv = safeNum(data.inventory_qty, 0);
+      const stockEl = document.getElementById("stock");
+      stockEl.textContent = inv > 0 ? `${inv} available` : "Sold out";
+
+      // Price: show sale if present
+      const priceEl = document.getElementById("price");
+      const price = safeNum(data.price_inr, 0);
+      const sale = data.sale_price_inr === null || data.sale_price_inr === undefined ? null : safeNum(data.sale_price_inr, 0);
+
+      if (sale && sale > 0 && sale < price) {
+        priceEl.innerHTML = `<span class="pd-price-sale">₹${sale}</span> <span class="pd-price-mrp">₹${price}</span>`;
+      } else {
+        priceEl.textContent = `₹${price}`;
+      }
+
+      // Images
+      const mainImg = document.getElementById("mainImg");
+      mainImg.src = main;
+      mainImg.alt = data.title ?? "Product image";
+
+      const thumbs = document.getElementById("thumbs");
+      thumbs.innerHTML = images.map((img, idx) => `
+        <button class="pd-thumb" data-idx="${idx}" type="button" aria-label="View image ${idx + 1}">
+          <img src="${img.image_url}" alt="${img.alt_text ?? data.title ?? ""}">
+        </button>
+      `).join("");
+
+      // ===== Lightbox logic =====
+      let currentIndex = 0;
+
+      const lightbox = document.getElementById("lightbox");
+      const lightboxImg = document.getElementById("lightboxImg");
+      const lbClose = document.getElementById("lbClose");
+      const lbPrev = document.getElementById("lbPrev");
+      const lbNext = document.getElementById("lbNext");
+
+      function openLightbox(idx) {
+        if (!images.length) return;
+        currentIndex = clamp(idx, 0, images.length - 1);
+        lightboxImg.src = images[currentIndex].image_url;
+        lightbox.classList.add("open");
+        lightbox.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+      }
+
+      function closeLightbox() {
+        lightbox.classList.remove("open");
+        lightbox.setAttribute("aria-hidden", "true");
+        document.body.style.overflow = "";
+      }
+
+      function showNext() {
+        if (!images.length) return;
+        currentIndex = (currentIndex + 1) % images.length;
+        lightboxImg.src = images[currentIndex].image_url;
+      }
+
+      function showPrev() {
+        if (!images.length) return;
+        currentIndex = (currentIndex - 1 + images.length) % images.length;
+        lightboxImg.src = images[currentIndex].image_url;
+      }
+
+      // Clicking main image opens lightbox
+      mainImg.addEventListener("click", () => {
+        const idx = images.findIndex(x => x.image_url === mainImg.src);
+        openLightbox(idx >= 0 ? idx : 0);
+      });
+
+      // Clicking thumbs switches main image (Nalli-like)
+      Array.from(thumbs.querySelectorAll("button")).forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const idx = Number(btn.getAttribute("data-idx") || "0");
+          mainImg.src = images[idx].image_url;
+        });
+
+        // Optional: double-click thumb to open zoom
+        btn.addEventListener("dblclick", () => {
+          const idx = Number(btn.getAttribute("data-idx") || "0");
+          openLightbox(idx);
+        });
+      });
+
+      // Lightbox controls
+      lbClose.addEventListener("click", closeLightbox);
+      lbNext.addEventListener("click", showNext);
+      lbPrev.addEventListener("click", showPrev);
+
+      lightbox.addEventListener("click", (e) => {
+        if (e.target === lightbox) closeLightbox();
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (!lightbox.classList.contains("open")) return;
+        if (e.key === "Escape") closeLightbox();
+        if (e.key === "ArrowRight") showNext();
+        if (e.key === "ArrowLeft") showPrev();
+      });
+
+      // ===== Quantity controls =====
+      const qtyInput = document.getElementById("qtyInput");
+      const qtyMinus = document.getElementById("qtyMinus");
+      const qtyPlus = document.getElementById("qtyPlus");
+
+      function getQty() {
+        const v = safeNum(qtyInput.value, 1);
+        // Limit qty to available stock (if stock is 0, keep at 1 but button disabled anyway)
+        const max = inv > 0 ? inv : 1;
+        return clamp(Math.floor(v), 1, max);
+      }
+
+      function setQty(n) {
+        qtyInput.value = String(getQty() === n ? n : clamp(n, 1, inv > 0 ? inv : 1));
+      }
+
+      qtyInput.addEventListener("input", () => setQty(getQty()));
+      qtyMinus.addEventListener("click", () => setQty(getQty() - 1));
+      qtyPlus.addEventListener("click", () => setQty(getQty() + 1));
+
+      // ===== Fetch & render specs =====
+      const { data: specs, error: specsErr } = await supabase
+        .from("product_specs")
+        .select("label,value,sort_order")
+        .eq("product_id", data.id)
+        .order("sort_order", { ascending: true });
+
+      const specsDiv = document.getElementById("specs");
+      if (specsErr) {
+        specsDiv.innerHTML = "<div class='small' style='opacity:.7'>Could not load specifications.</div>";
+      } else if (!specs || specs.length === 0) {
+        specsDiv.innerHTML = "<div class='small' style='opacity:.7'>No specifications added.</div>";
+      } else {
+        specsDiv.innerHTML = `
+          <div class="spec-grid">
+            ${specs.map(s => `
+              <div class="spec-k">${s.label}</div>
+              <div class="spec-v">${s.value}</div>
+            `).join("")}
+          </div>
+        `;
+      }
+
+      // ===== Fetch & render sections (accordion) =====
+      const { data: sections, error: secErr } = await supabase
+        .from("product_sections")
+        .select("title,content,content_type,sort_order")
+        .eq("product_id", data.id)
+        .order("sort_order", { ascending: true });
+
+      const sectionsDiv = document.getElementById("sections");
+      if (secErr) {
+        sectionsDiv.innerHTML = "<div class='small' style='opacity:.7'>Could not load product details.</div>";
+      } else if (!sections || sections.length === 0) {
+        sectionsDiv.innerHTML = "<div class='small' style='opacity:.7'>No additional details added.</div>";
+      } else {
+        sectionsDiv.innerHTML = sections.map((sec, idx) => {
+          const isBullets = (sec.content_type || "text") === "bullets";
+          const content = (sec.content || "").trim();
+
+          const contentHtml = isBullets
+            ? `<ul class="bullets">${content.split("\n").filter(Boolean).map(li => `<li>${li}</li>`).join("")}</ul>`
+            : `<div>${content.replace(/\n/g, "<br>")}</div>`;
+
+          return `
+            <div class="ac-item ${idx === 0 ? "open" : ""}">
+              <button class="ac-btn" type="button">
+                <span>${sec.title}</span>
+                <span class="ac-chevron">▾</span>
+              </button>
+              <div class="ac-content">${contentHtml}</div>
+            </div>
+          `;
+        }).join("");
+
+        Array.from(sectionsDiv.querySelectorAll(".ac-item")).forEach(item => {
+          const btn = item.querySelector(".ac-btn");
+          btn.addEventListener("click", () => item.classList.toggle("open"));
+        });
+      }
+
+      // ===== Add to cart (uses qty) =====
+      const addBtn = document.getElementById("addBtn");
+      if (inv <= 0) {
+        addBtn.disabled = true;
+        addBtn.textContent = "Sold out";
+        addBtn.style.background = "#ddd";
+        addBtn.style.borderColor = "#ddd";
+        addBtn.style.color = "#666";
+      } else {
+        addBtn.addEventListener("click", () => {
+          const qty = getQty();
+          addToCart({ ...data, image_url: main }, qty);
+          location.href = "cart.html";
+        });
+      }
+
+      // ===== Wishlist =====
+      // NOTE: We use the shared wishlist helpers in assets/wishlist.js.
+      // This fixes the old mismatch where product.html used "wishlist_items"
+      // but the wishlist page used a different table.
+      const wishBtn = document.getElementById("wishBtn");
+
+      async function syncWishlistButton() {
+        if (!wishBtn) return;
+        const inWish = await isInWishlist(data.id);
+        wishBtn.textContent = inWish ? "♥ In wishlist" : "♡ Wishlist";
+        wishBtn.dataset.inWishlist = inWish ? "1" : "0";
+      }
+
+      if (wishBtn) {
+        wishBtn.addEventListener("click", async () => {
+          const inWish = wishBtn.dataset.inWishlist === "1";
+          if (inWish) {
+            const res = await removeFromWishlist(data.id);
+            if (!res?.success) {
+              alert("Could not remove from wishlist. Please try again.");
+            }
+          } else {
+            const res = await addToWishlist(data.id);
+            if (!res?.success) {
+              // Duplicate is not a hard error; still refresh UI
+              if (res?.message && res.message !== "Already in wishlist") {
+                alert(res.message);
+              }
+            }
+          }
+          await syncWishlistButton();
+        });
+
+        // initial state
+        await syncWishlistButton();
+      }
+
+    }
+
+    loadProduct();
+  </script>
+</body>
+</html>

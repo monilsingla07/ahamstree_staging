@@ -1,0 +1,137 @@
+<!doctype html>
+<html>
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CKQ1EXBHY6"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);} 
+    gtag('js', new Date());
+    gtag('config', 'G-CKQ1EXBHY6');
+  </script>
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Orders — AhamStree</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+
+<body>
+  <div id="header"></div>
+
+  <div class="container" style="max-width:980px;">
+    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start;">
+      <div>
+        <h2 style="margin:0;">My Orders</h2>
+        <div class="small" style="margin-top:6px;">Your recent orders and payment status.</div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <a class="btn secondary" href="account.html">Account</a>
+        <a class="btn secondary" href="profile.html">Profile</a>
+      </div>
+    </div>
+
+    <hr />
+
+    <div id="status" class="small">Loading…</div>
+    <div id="list" style="display:grid;gap:12px;margin-top:12px;"></div>
+  </div>
+
+  <div id="footer"></div>
+
+  <script type="module">
+    import { renderHeader, renderFooter, hydrateHeaderAuth } from "./assets/ui.js";
+    import { supabase } from "./assets/supabase.js";
+
+    document.getElementById("header").innerHTML = renderHeader("account");
+    document.getElementById("footer").innerHTML = renderFooter();
+    hydrateHeaderAuth();
+
+    const status = document.getElementById("status");
+    const list = document.getElementById("list");
+
+    function money(v) {
+      return "₹" + Number(v || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
+    }
+
+    function badge(st) {
+      const map = {
+        paid: "Paid",
+        payment_link_created: "Payment pending",
+        payment_failed: "Payment failed",
+        expired: "Payment expired",
+        cancelled: "Cancelled",
+        fulfilled: "Fulfilled",
+        shipped: "Shipped",
+        delivered: "Delivered",
+      };
+      return map[st] || (st || "-");
+    }
+
+    function renderOrder(o) {
+      const items = (o.order_items || [])
+        .map(it => `<div class="small">${it.qty} × ${it.title} — ${money(it.price_inr)}</div>`)
+        .join("");
+
+      const payLink = o.razorpay_payment_link_url;
+      const canPay = (o.status === "payment_link_created" || o.status === "payment_failed" || o.status === "expired") && payLink;
+
+      return `
+        <div class="card">
+          <div class="p" style="padding:16px;">
+            <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start;">
+              <div>
+                <div style="font-weight:900;">Order ${o.id}</div>
+                <div class="small" style="margin-top:6px;">
+                  Status: <b>${badge(o.status)}</b> • Total: <b>${money(o.total_inr)}</b>
+                </div>
+                <div class="small">Placed: ${o.created_at ? new Date(o.created_at).toLocaleString("en-IN") : "-"}</div>
+              </div>
+
+              <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                ${canPay ? `<a class="btn" href="${payLink}" target="_blank" rel="noopener">Pay now</a>` : ``}
+              </div>
+            </div>
+            <hr />
+            ${items || `<div class="small" style="opacity:.75;">No items found for this order.</div>`}
+          </div>
+        </div>
+      `;
+    }
+
+    async function loadOrders() {
+      const { data: sess } = await supabase.auth.getSession();
+      const user = sess?.session?.user;
+      if (!user) {
+        window.location.href = "login.html";
+        return;
+      }
+
+      // IMPORTANT:
+      // This assumes your `orders` table has a `user_id` column.
+      // If your column name differs (e.g., customer_id), tell me and I will adjust.
+      const { data, error } = await supabase
+        .from("orders")
+        .select("id,status,total_inr,created_at,razorpay_payment_link_url, order_items(qty,title,price_inr)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        status.textContent = "Could not load orders: " + error.message;
+        list.innerHTML = "";
+        return;
+      }
+
+      const orders = data ?? [];
+      status.textContent = orders.length ? "" : "You have no orders yet.";
+      list.innerHTML = orders.map(renderOrder).join("");
+    }
+
+    loadOrders();
+  </script>
+</body>
+</html>

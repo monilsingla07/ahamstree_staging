@@ -1,0 +1,83 @@
+<!doctype html>
+<html>
+<head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-CKQ1EXBHY6"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-CKQ1EXBHY6');
+</script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Blog — Ahamstree</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div id="header"></div>
+
+  <div class="container" style="max-width:900px;">
+    <h1 id="title" style="margin-top:0;"></h1>
+    <div id="meta" class="small" style="margin-top:6px;opacity:.8;"></div>
+    <div id="cover" style="margin-top:14px;"></div>
+    <hr />
+    <div id="status" class="small">Loading…</div>
+    <div id="content" style="line-height:1.7;"></div>
+  </div>
+
+  <div id="footer"></div>
+
+  <script type="module">
+    import { renderHeader, renderFooter, hydrateHeaderAuth } from "./assets/ui.js";
+    import { supabase } from "./assets/supabase.js";
+
+    document.getElementById("header").innerHTML = renderHeader("");
+    document.getElementById("footer").innerHTML = renderFooter();
+    hydrateHeaderAuth();
+
+    const params = new URLSearchParams(location.search);
+    const slug = params.get("slug");
+
+    async function loadPost() {
+      const status = document.getElementById("status");
+      const title = document.getElementById("title");
+      const meta = document.getElementById("meta");
+      const cover = document.getElementById("cover");
+      const content = document.getElementById("content");
+
+      if (!slug) { status.textContent = "Missing blog slug."; return; }
+
+      const { data, error } = await supabase
+        .from("blog_posts")
+        .select("title,content,cover_image_url,published_at,is_published")
+        .eq("slug", slug)
+        .eq("is_published", true)
+        .maybeSingle();
+
+      if (error || !data) { status.textContent = "Post not found."; return; }
+
+      status.textContent = "";
+      title.textContent = data.title;
+      meta.textContent = data.published_at ? new Date(data.published_at).toDateString() : "";
+
+      cover.innerHTML = data.cover_image_url
+        ? `<img src="${data.cover_image_url}" alt="${data.title}" style="width:100%;border-radius:16px;max-height:420px;object-fit:cover;">`
+        : "";
+
+      // Content can be plain text or HTML
+      // Safe render as text (no HTML execution)
+content.textContent = data.content ?? "";
+content.style.whiteSpace = "pre-wrap";
+
+    }
+
+    loadPost();
+  </script>
+</body>
+</html>

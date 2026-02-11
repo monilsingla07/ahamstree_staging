@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+<head>
+  <!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-CKQ1EXBHY6"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-CKQ1EXBHY6');
+</script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Collections — Ahamstree</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div id="header"></div>
+
+  <div class="container">
+    <h2 style="margin-top:0;">Collections</h2>
+    <div class="small">Curated edits</div>
+    <hr />
+    <div id="status" class="small">Loading…</div>
+    <div id="grid" class="grid" style="margin-top:12px;"></div>
+  </div>
+
+  <div id="footer"></div>
+
+  <script type="module">
+    import { renderHeader, renderFooter, hydrateHeaderAuth } from "./assets/ui.js";
+    import { supabase } from "./assets/supabase.js";
+
+    document.getElementById("header").innerHTML = renderHeader("");
+    document.getElementById("footer").innerHTML = renderFooter();
+    hydrateHeaderAuth();
+
+    async function loadCollections() {
+      const status = document.getElementById("status");
+      const grid = document.getElementById("grid");
+
+      const { data, error } = await supabase
+        .from("collections")
+        .select("name,slug,description,cover_image_url,is_active,created_at")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false });
+
+      if (error) { status.textContent = "Error: " + error.message; return; }
+      status.textContent = "";
+
+      grid.innerHTML = (data ?? []).map(c => `
+        <div class="card">
+          <a href="collection.html?slug=${encodeURIComponent(c.slug)}" style="text-decoration:none;color:inherit;">
+            ${c.cover_image_url ? `<img src="${c.cover_image_url}" alt="${c.name}" loading="lazy">` : `<div style="height:220px;background:#fafafa;"></div>`}
+            <div class="p">
+              <div style="font-weight:900;">${c.name}</div>
+              <div class="small" style="margin-top:6px;opacity:.85;">${c.description ?? ""}</div>
+            </div>
+          </a>
+        </div>
+      `).join("");
+    }
+
+    loadCollections();
+  </script>
+</body>
+</html>

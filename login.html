@@ -1,0 +1,315 @@
+<!doctype html>
+<html>
+<head>
+  <!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-CKQ1EXBHY6"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-CKQ1EXBHY6');
+</script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Account — AhamStree</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div id="header"></div>
+
+  <div class="container">
+    <h2 style="margin-top:0;">Account</h2>
+
+       <div id="app" class="card" style="padding:16px;border-radius:16px;max-width:680px;">
+      <div class="small">Loading account…</div>
+    </div>
+  </div>
+
+  <div id="footer"></div>
+
+  <script type="module">
+    import { renderHeader, renderFooter, hydrateHeaderAuth } from "./assets/ui.js";
+import { supabase } from "./assets/supabase.js";
+
+
+    document.getElementById("header").innerHTML = renderHeader("login");
+    hydrateHeaderAuth();
+document.getElementById("footer").innerHTML = renderFooter();
+
+
+
+    const app = document.getElementById("app");
+
+
+    // If user came here from another page, we keep where to go next
+    const __params = new URLSearchParams(location.search);
+    const __nextRaw = __params.get("next");
+
+    function getNextUrl() {
+      if (!__nextRaw) return null;
+      let decoded = "";
+      try { decoded = decodeURIComponent(__nextRaw); } catch { decoded = __nextRaw; }
+
+      // Allow only same-site relative paths to avoid open redirects
+      if (decoded.startsWith("/")) return decoded;
+      if (decoded.endsWith(".html") || decoded.includes(".html?")) return "/" + decoded.replace(/^\/+/, "");
+      return null;
+    }
+
+    const NEXT_URL = getNextUrl();
+
+
+        function renderLoggedOut() {
+  app.innerHTML = `
+    <div style="font-weight:900;">Login</div>
+    <div class="small" style="margin-top:6px;">
+      Log in with your email and password.
+    </div>
+
+    <div id="panel" style="margin-top:14px;"></div>
+
+    <div id="status" class="small" style="margin-top:10px;"></div>
+  `;
+
+  const panel = document.getElementById("panel");
+  const status = document.getElementById("status");
+
+  const escapeHtml = (s) =>
+    String(s ?? "").replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;",
+    }[c]));
+
+  function renderLogin() {
+    panel.innerHTML = `
+      <div style="display:grid;gap:10px;">
+        <input id="loginEmail" class="input" type="email" placeholder="Email address" required />
+        <div style="position:relative;">
+          <input id="loginPassword" class="input" type="password" placeholder="Password" required />
+          <button id="toggleLoginPw" type="button" class="btn secondary"
+            style="position:absolute;right:8px;top:8px;padding:6px 10px;">
+            Show
+          </button>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
+        <button id="doLogin" class="btn">Log in</button>
+        <button id="goSignup" class="btn secondary">New user</button>
+      </div>
+    `;
+
+    const toggleBtn = document.getElementById("toggleLoginPw");
+    toggleBtn.onclick = () => {
+      const pw = document.getElementById("loginPassword");
+      const isHidden = pw.type === "password";
+      pw.type = isHidden ? "text" : "password";
+      toggleBtn.textContent = isHidden ? "Hide" : "Show";
+    };
+
+    document.getElementById("doLogin").onclick = async () => {
+      status.textContent = "";
+
+      const email = document.getElementById("loginEmail").value.trim();
+      const password = document.getElementById("loginPassword").value;
+
+      if (!email) return (status.textContent = "Please enter your email.");
+      if (!password) return (status.textContent = "Please enter your password.");
+
+      status.textContent = "Logging in…";
+
+const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+if (error) {
+  status.textContent = "Error: " + error.message;
+} else {
+  status.textContent = "Logged in ✅ Redirecting…";
+  setTimeout(() => {
+    window.location.href = (NEXT_URL || "/account.html");
+  }, 500);
+}
+
+    };
+
+    document.getElementById("goSignup").onclick = renderSignup;
+  }
+
+  function renderSignup() {
+    panel.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-weight:900;">Create account</div>
+        <button id="goLogin" type="button" class="btn secondary">Back to login</button>
+      </div>
+
+      <div class="small" style="margin-top:6px;">
+        All fields are required. Password must be at least 8 characters.
+      </div>
+
+      <div style="margin-top:14px;display:grid;gap:10px;">
+        <input id="fullName" class="input" type="text" placeholder="Full name" required />
+        <input id="phone" class="input" type="tel" placeholder="Phone number" required />
+        <input id="signupEmail" class="input" type="email" placeholder="Email address" required />
+
+        <div style="position:relative;">
+          <input id="signupPassword" class="input" type="password" placeholder="Password (min 8 chars)" required />
+          <button id="toggleSignupPw" type="button" class="btn secondary"
+            style="position:absolute;right:8px;top:8px;padding:6px 10px;">
+            Show
+          </button>
+        </div>
+
+        <div style="position:relative;">
+          <input id="signupPassword2" class="input" type="password" placeholder="Confirm password" required />
+          <button id="toggleSignupPw2" type="button" class="btn secondary"
+            style="position:absolute;right:8px;top:8px;padding:6px 10px;">
+            Show
+          </button>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
+        <button id="doSignup" class="btn">Create account</button>
+      </div>
+    `;
+
+    document.getElementById("goLogin").onclick = renderLogin;
+
+    const toggle = (inputId, btnId) => {
+      const pw = document.getElementById(inputId);
+      const btn = document.getElementById(btnId);
+      btn.onclick = () => {
+        const isHidden = pw.type === "password";
+        pw.type = isHidden ? "text" : "password";
+        btn.textContent = isHidden ? "Hide" : "Show";
+      };
+    };
+
+    toggle("signupPassword", "toggleSignupPw");
+    toggle("signupPassword2", "toggleSignupPw2");
+
+    const validateSignup = () => {
+      const full_name = document.getElementById("fullName").value.trim();
+      const phone = document.getElementById("phone").value.trim();
+      const email = document.getElementById("signupEmail").value.trim();
+      const password = document.getElementById("signupPassword").value;
+      const confirm = document.getElementById("signupPassword2").value;
+
+      if (!full_name) return "Please enter your full name.";
+      if (!phone) return "Please enter your phone number.";
+      if (!email) return "Please enter your email.";
+      if (!password) return "Please enter a password.";
+      if (password.length < 8) return "Password must be at least 8 characters.";
+      if (!confirm) return "Please confirm your password.";
+      if (password !== confirm) return "Passwords do not match.";
+      return null;
+    };
+
+    document.getElementById("doSignup").onclick = async () => {
+      status.textContent = "";
+
+      const err = validateSignup();
+      if (err) return (status.textContent = err);
+
+      const full_name = document.getElementById("fullName").value.trim();
+      const phone = document.getElementById("phone").value.trim();
+      const email = document.getElementById("signupEmail").value.trim();
+      const password = document.getElementById("signupPassword").value;
+
+      status.textContent = "Creating account… please check your email to verify.";
+
+      // Save profile info temporarily so we can write it after login
+      localStorage.setItem("pending_profile", JSON.stringify({ full_name, phone }));
+
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: window.location.origin + (NEXT_URL || "/account.html"),
+        },
+      });
+
+      status.textContent = error
+        ? ("Error: " + error.message)
+        : "Account created. Please verify your email, then log in.";
+    };
+  }
+
+  // Default: show login form first
+  renderLogin();
+}
+
+
+
+function renderLoggedIn(email) {
+
+  // Already signed in: take user back to where they wanted to go
+  if (NEXT_URL) {
+    window.location.href = NEXT_URL;
+    return;
+  }
+
+  app.innerHTML = `
+    <div style="font-weight:900;">My Account</div>
+    <div class="small" style="margin-top:6px;">Signed in as ${email}</div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">
+      <a class="btn secondary" href="orders.html">Orders</a>
+      <a class="btn secondary" href="profile.html">Profile</a>
+      <button id="logout" class="btn">Log out</button>
+    </div>
+  `;
+
+  document.getElementById("logout").onclick = async () => {
+    await supabase.auth.signOut();
+  };
+}
+
+async function upsertProfileIfPending(userId) {
+  const raw = localStorage.getItem("pending_profile");
+  if (!raw) return;
+
+  const pending = JSON.parse(raw);
+  localStorage.removeItem("pending_profile");
+
+  // Write profile row (requires RLS policy allowing user to upsert their own profile)
+  await supabase.from("profiles").upsert({
+    user_id: userId,
+    full_name: pending.full_name || null,
+    phone: pending.phone || null,
+  });
+}
+
+    // Initial render
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userEmail = sessionData?.session?.user?.email;
+  if (userEmail) renderLoggedIn(userEmail);
+else renderLoggedOut();
+
+
+
+    // Keep in sync if auth changes
+    supabase.auth.onAuthStateChange(async (_event, session) => {
+  hydrateHeaderAuth();
+
+  const e = session?.user?.email;
+  const uid = session?.user?.id;
+
+  if (e && uid) {
+    await upsertProfileIfPending(uid);
+    renderLoggedIn(e);
+  } else {
+    renderLoggedOut();
+  }
+});
+
+  </script>
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!doctype html>
+<html>
+<head>
+  <!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-CKQ1EXBHY6"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-CKQ1EXBHY6');
+</script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin — AhamStree</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div id="header"></div>
+  <div class="container">
+    <h2 style="margin-top:0;">Admin Dashboard</h2>
+
+    <div id="cards" class="grid"></div>
+    <div style="margin-top:14px;">
+      <a class="btn secondary" href="admin-orders.html">View Orders</a>
+    </div>
+
+    <div id="status" class="small" style="margin-top:10px;"></div>
+  </div>
+  <div id="footer"></div>
+
+  <script type="module">
+    import { renderHeader, renderFooter, hydrateHeaderAuth } from "./assets/ui.js";
+    import { supabase } from "./assets/supabase.js";
+
+    document.getElementById("header").innerHTML = renderHeader("admin");
+    document.getElementById("footer").innerHTML = renderFooter();
+    hydrateHeaderAuth();
+
+    const status = document.getElementById("status");
+    const cards = document.getElementById("cards");
+
+    const { data: sess } = await supabase.auth.getSession();
+    if (!sess?.session) {
+      window.location.href = "login.html";
+    }
+
+    status.textContent = "Loading…";
+
+    const { data, error } = await supabase.functions.invoke("admin-dashboard");
+    if (error) {
+      status.textContent = "Access denied / error: " + error.message;
+      cards.innerHTML = "";
+    } else {
+      status.textContent = "";
+      const items = [
+        ["Orders", data.ordersCount],
+        ["Users", data.usersCount],
+        ["Paid", data.paidCount],
+        ["Pending", data.pendingCount],
+        ["Failed", data.failedCount],
+        ["Expired", data.expiredCount],
+        ["Revenue (paid)", "₹" + Number(data.revenuePaidInr||0).toLocaleString("en-IN")],
+      ];
+      cards.innerHTML = items.map(([k,v]) => `
+        <div class="card"><div class="p">
+          <div style="font-weight:900;">${k}</div>
+          <div style="font-size:22px;margin-top:6px;">${v}</div>
+        </div></div>
+      `).join("");
+    }
+  </script>
+</body>
+</html>

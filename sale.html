@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+<head>
+  <!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-CKQ1EXBHY6"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-CKQ1EXBHY6');
+</script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sale — Ahamstree</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div id="header"></div>
+
+  <div class="container">
+    <h2 style="margin-top:0;">Sale</h2>
+    <div class="small">Discounted picks</div>
+    <hr />
+    <div id="status" class="small">Loading…</div>
+    <div id="grid" class="grid" style="margin-top:12px;"></div>
+  </div>
+
+  <div id="footer"></div>
+
+  <script type="module">
+    import { renderHeader, renderFooter, hydrateHeaderAuth } from "./assets/ui.js";
+    import { supabase } from "./assets/supabase.js";
+
+    document.getElementById("header").innerHTML = renderHeader("");
+    document.getElementById("footer").innerHTML = renderFooter();
+    hydrateHeaderAuth();
+
+    function pctOff(price, sale) {
+      if (!price || !sale) return "";
+      const off = Math.round((1 - (sale / price)) * 100);
+      return off > 0 ? `${off}% OFF` : "";
+    }
+
+    async function loadSale() {
+      const status = document.getElementById("status");
+      const grid = document.getElementById("grid");
+
+      const { data, error } = await supabase
+        .from("products")
+        .select("id,title,price_inr,sale_price_inr,inventory_qty,is_active, product_images(image_url, sort_order)")
+        .eq("is_active", true)
+        .not("sale_price_inr", "is", null)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        status.textContent = "Error: " + error.message;
+        return;
+      }
+
+      status.textContent = "";
+
+      const normalized = (data ?? []).map(p => {
+        const imgs = (p.product_images ?? []).slice().sort((a,b)=> (a.sort_order??0)-(b.sort_order??0));
+        return { ...p, image_url: imgs[0]?.image_url ?? "" };
+      });
+
+      grid.innerHTML = normalized.map(p => {
+        const badge = pctOff(p.price_inr, p.sale_price_inr);
+        return `
+          <div class="card">
+            <a href="product.html?id=${encodeURIComponent(p.id)}" style="text-decoration:none;color:inherit;">
+              ${p.image_url ? `<img src="${p.image_url}" alt="${p.title}" loading="lazy">` : `<div style="height:280px;background:#fafafa;"></div>`}
+              <div class="p">
+                <div style="font-weight:900;display:flex;justify-content:space-between;gap:10px;">
+                  <span>${p.title}</span>
+                  ${badge ? `<span class="small" style="font-weight:800;">${badge}</span>` : ``}
+                </div>
+                <div style="margin-top:6px;opacity:.9;">
+                  <span style="font-weight:900;">₹${p.sale_price_inr}</span>
+                  <span class="small" style="text-decoration:line-through;opacity:.7;margin-left:8px;">₹${p.price_inr}</span>
+                </div>
+                <div class="small" style="margin-top:6px;">
+                  ${p.inventory_qty > 0 ? `${p.inventory_qty} in stock` : "Sold out"}
+                </div>
+              </div>
+            </a>
+          </div>
+        `;
+      }).join("");
+    }
+
+    loadSale();
+  </script>
+</body>
+</html>

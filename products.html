@@ -1,0 +1,397 @@
+<!doctype html>
+<html>
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CKQ1EXBHY6"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);} 
+    gtag('js', new Date());
+    gtag('config', 'G-CKQ1EXBHY6');
+  </script>
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Products — AhamStree</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div id="header"></div>
+
+  <div class="container">
+    <h2 id="pageTitle" style="margin-top:0;">Sarees</h2>
+    <div class="small">Click a product to view details</div>
+
+    <!-- Nalli-like toolbar row -->
+    <div class="listing-toolbar" style="margin-top:12px;">
+      <button id="openFilters" class="toolbar-btn" type="button">
+        <span class="toolbar-btn-icon" aria-hidden="true">☰</span>
+        <span>Show Filters</span>
+      </button>
+
+      <div id="itemsCount" class="toolbar-count small">&nbsp;</div>
+
+      <select id="sortBy" class="input toolbar-sort" aria-label="Sort">
+        <option value="newest">Newest</option>
+        <option value="mostLoved">Most loved</option>
+        <option value="priceLow">Price: Low to High</option>
+        <option value="priceHigh">Price: High to Low</option>
+      </select>
+    </div>
+
+    <hr />
+
+    <div id="status" class="small">Loading…</div>
+    <div id="grid" class="grid" style="margin-top:12px;"></div>
+  </div>
+
+  <!-- Filter drawer (Nalli-like) -->
+  <div id="filterOverlay" class="drawer-overlay" aria-hidden="true"></div>
+
+  <aside id="filterDrawer" class="filter-drawer" aria-hidden="true" aria-label="Filter">
+    <div class="filter-drawer-head">
+      <div class="filter-drawer-title">Filter</div>
+      <button id="closeFilters" class="icon-btn" type="button" aria-label="Close filters">✕</button>
+    </div>
+
+    <div class="filter-drawer-body">
+      <div class="filter-block">
+        <div class="filter-title">Collection</div>
+        <div id="collectionList" class="filter-list small">Loading…</div>
+      </div>
+
+      <!-- NEW: Fabric Type Filter -->
+      <div class="filter-block">
+        <div class="filter-title">Fabric Type</div>
+        <div class="filter-list">
+          <label class="filter-option">
+            <input type="checkbox" name="fabric" value="silk" />
+            <span>Silk</span>
+          </label>
+          <label class="filter-option">
+            <input type="checkbox" name="fabric" value="cotton" />
+            <span>Cotton</span>
+          </label>
+          <label class="filter-option">
+            <input type="checkbox" name="fabric" value="banarasi" />
+            <span>Banarasi</span>
+          </label>
+          <label class="filter-option">
+            <input type="checkbox" name="fabric" value="kanjivaram" />
+            <span>Kanjivaram</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="filter-block">
+        <div class="filter-title">Price (₹)</div>
+        <div class="price-row">
+          <input id="minPrice" class="input" placeholder="Min" inputmode="numeric" />
+          <input id="maxPrice" class="input" placeholder="Max" inputmode="numeric" />
+        </div>
+        <div class="small" style="margin-top:10px; opacity:.75;">Tip: leave blank to ignore.</div>
+      </div>
+
+      <!-- NEW: In Stock Only Filter -->
+      <div class="filter-block">
+        <div class="filter-title">Availability</div>
+        <label class="filter-option">
+          <input type="checkbox" id="inStockOnly" />
+          <span>In Stock Only</span>
+        </label>
+      </div>
+
+      <button id="clearAll" class="btn secondary" style="margin-top:12px;width:100%;">Clear all</button>
+    </div>
+
+    <div class="filter-drawer-foot">
+      <button id="applyFilters" class="btn" style="width:100%;">See items</button>
+    </div>
+  </aside>
+
+
+  <div id="footer"></div>
+
+<script type="module">
+  import { renderHeader, renderFooter, hydrateHeaderAuth } from "./assets/ui.js";
+  import { supabase } from "./assets/supabase.js";
+
+  document.getElementById("header").innerHTML = renderHeader("products");
+  document.getElementById("footer").innerHTML = renderFooter();
+  hydrateHeaderAuth();
+
+  const status = document.getElementById("status");
+  const grid = document.getElementById("grid");
+  const itemsCount = document.getElementById("itemsCount");
+  const applyFiltersBtn = document.getElementById("applyFilters");
+
+  const url = new URL(location.href);
+  const params = url.searchParams;
+
+  function numOrNull(v) {
+    if (v === null || v === undefined) return null;
+    const s = String(v).trim();
+    if (s === "") return null;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function setParam(k, v){
+    if (v === null || v === undefined || v === "") params.delete(k);
+    else params.set(k, String(v));
+
+    const qs = params.toString();
+    history.replaceState({}, "", qs ? (url.pathname + "?" + qs) : url.pathname);
+  }
+
+  function moneyINR(v){
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "";
+    return "₹" + n.toLocaleString("en-IN");
+  }
+
+  // ===== Drawer open/close (Nalli-like) =====
+  const overlay = document.getElementById("filterOverlay");
+  const drawer = document.getElementById("filterDrawer");
+  const openBtn = document.getElementById("openFilters");
+  const closeBtn = document.getElementById("closeFilters");
+
+  function openDrawer(){
+    overlay.classList.add("open");
+    drawer.classList.add("open");
+    overlay.setAttribute("aria-hidden", "false");
+    drawer.setAttribute("aria-hidden", "false");
+    document.body.classList.add("no-scroll");
+  }
+
+  function closeDrawer(){
+    overlay.classList.remove("open");
+    drawer.classList.remove("open");
+    overlay.setAttribute("aria-hidden", "true");
+    drawer.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("no-scroll");
+  }
+
+  openBtn.addEventListener("click", openDrawer);
+  closeBtn.addEventListener("click", closeDrawer);
+  overlay.addEventListener("click", closeDrawer);
+  window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
+
+  async function loadCollections(){
+    const box = document.getElementById("collectionList");
+    const selected = params.get("collection") || "";
+
+    const { data, error } = await supabase
+      .from("collections")
+      .select("id,name,slug")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false });
+
+    if (error){
+      box.textContent = "Could not load collections.";
+      return;
+    }
+
+    box.innerHTML = `
+      <label class="filter-option">
+        <input type="radio" name="col" value="" ${selected ? "" : "checked"} />
+        <span>All</span>
+      </label>
+    ` + (data ?? []).map(c => `
+      <label class="filter-option">
+        <input type="radio" name="col" value="${c.slug}" ${c.slug === selected ? "checked" : ""} />
+        <span>${c.name}</span>
+      </label>
+    `).join("");
+
+    // Nalli-like: changes are applied when user taps "See items"
+    Array.from(box.querySelectorAll("input[name='col']")).forEach(r => {
+      r.addEventListener("change", () => {
+        setParam("collection", r.value);
+      });
+    });
+  }
+
+  async function loadProducts(){
+    status.textContent = "Loading…";
+    grid.innerHTML = "";
+
+    const selectedSlug = params.get("collection") || "";
+    const min = numOrNull(params.get("min"));
+    const max = numOrNull(params.get("max"));
+    const sort = params.get("sort") || "newest";
+    
+    // NEW: Get fabric filters
+    const selectedFabrics = params.get("fabrics")?.split(',').filter(Boolean) || [];
+    const inStockOnly = params.get("inStock") === "true";
+
+    let productIds = null;
+
+    if (selectedSlug){
+      const { data: col, error: colErr } = await supabase
+        .from("collections")
+        .select("id,name")
+        .eq("slug", selectedSlug)
+        .maybeSingle();
+
+      if (colErr || !col){
+        status.textContent = "Collection not found.";
+        return;
+      }
+
+      document.getElementById("pageTitle").textContent = col.name;
+
+      const { data: links, error: linkErr } = await supabase
+        .from("collection_products")
+        .select("product_id")
+        .eq("collection_id", col.id);
+
+      if (linkErr){
+        status.textContent = "Could not load collection products.";
+        return;
+      }
+
+      productIds = (links ?? []).map(x => x.product_id);
+
+      if (productIds.length === 0){
+        status.textContent = "No products in this collection yet.";
+        itemsCount.textContent = "0 items";
+        applyFiltersBtn.textContent = "See items";
+        return;
+      }
+    } else {
+      document.getElementById("pageTitle").textContent = "Sarees";
+    }
+
+    if (min !== null && max !== null && min > max) {
+      status.textContent = "Min price cannot be greater than Max price.";
+      return;
+    }
+
+    let query = supabase
+      .from("products")
+      .select("id,title,price_inr,inventory_qty,is_active,created_at,view_count,product_images(image_url, sort_order)")
+      .eq("is_active", true);
+
+    if (productIds) query = query.in("id", productIds);
+    if (min !== null) query = query.gte("price_inr", min);
+    if (max !== null) query = query.lte("price_inr", max);
+    
+    
+    // NEW: Apply stock filter
+    if (inStockOnly) {
+      query = query.gt("inventory_qty", 0);
+    }
+
+    if (sort === "mostLoved") query = query.order("view_count", { ascending: false }).order("created_at", { ascending: false });
+    else if (sort === "priceLow") query = query.order("price_inr", { ascending: true });
+    else if (sort === "priceHigh") query = query.order("price_inr", { ascending: false });
+    else query = query.order("created_at", { ascending: false });
+
+    const { data, error } = await query;
+
+    if (error){
+      status.textContent = "Error: " + error.message;
+      return;
+    }
+
+    const normalized = (data ?? []).map(p => {
+      const imgs = (p.product_images ?? []).slice().sort((a,b)=> (a.sort_order??0)-(b.sort_order??0));
+      return { ...p, image_url: imgs[0]?.image_url ?? "" };
+    });
+
+    status.textContent = normalized.length ? "" : "No products found.";
+
+    // Update Nalli-like counts / CTA
+    itemsCount.textContent = `${normalized.length} items`;
+    applyFiltersBtn.textContent = normalized.length ? `See ${normalized.length} items` : "See items";
+
+    grid.innerHTML = normalized.map(p => `
+      <div class="card product-card">
+        <a class="product-link" href="product.html?id=${encodeURIComponent(p.id)}">
+          ${p.image_url ? `<img src="${p.image_url}" alt="${p.title}" loading="lazy">` : `<div style="height:280px;background:#fafafa;"></div>`}
+          <div class="p">
+            <div class="product-title">${p.title}</div>
+            <div style="margin-top:6px;opacity:.85;">${moneyINR(p.price_inr)}</div>
+            <div class="small" style="margin-top:6px;">
+              ${p.inventory_qty > 0 ? `${p.inventory_qty} in stock` : "Sold out"}
+            </div>
+          </div>
+        </a>
+      </div>
+    `).join("");
+  }
+
+  // Init control values from URL
+  document.getElementById("minPrice").value = params.get("min") || "";
+  document.getElementById("maxPrice").value = params.get("max") || "";
+  document.getElementById("sortBy").value = params.get("sort") || "newest";
+  
+  // NEW: Init fabric checkboxes from URL
+  const savedFabrics = params.get("fabrics")?.split(',').filter(Boolean) || [];
+  savedFabrics.forEach(fabric => {
+    const checkbox = document.querySelector(`input[name="fabric"][value="${fabric}"]`);
+    if (checkbox) checkbox.checked = true;
+  });
+  
+  // NEW: Init stock checkbox from URL
+  document.getElementById("inStockOnly").checked = params.get("inStock") === "true";
+
+  // Sort applies immediately (like Nalli)
+  document.getElementById("sortBy").addEventListener("change", (e) => {
+    setParam("sort", e.target.value);
+    loadProducts();
+  });
+
+  // Apply button applies price + refreshes products, then closes drawer
+  applyFiltersBtn.addEventListener("click", () => {
+    setParam("min", document.getElementById("minPrice").value.trim());
+    setParam("max", document.getElementById("maxPrice").value.trim());
+    
+    // NEW: Save fabric selections
+    const fabricCheckboxes = document.querySelectorAll('input[name="fabric"]:checked');
+    const selectedFabrics = Array.from(fabricCheckboxes).map(cb => cb.value);
+    setParam("fabrics", selectedFabrics.join(','));
+    
+    // NEW: Save stock filter
+    setParam("inStock", document.getElementById("inStockOnly").checked ? "true" : "");
+    
+    loadProducts();
+    closeDrawer();
+  });
+
+  // Clear all resets everything
+  document.getElementById("clearAll").addEventListener("click", () => {
+    params.delete("collection"); 
+    params.delete("min"); 
+    params.delete("max"); 
+    params.delete("sort");
+    params.delete("fabrics");  // NEW
+    params.delete("inStock");  // NEW
+    history.replaceState({}, "", url.pathname);
+
+    document.getElementById("minPrice").value = "";
+    document.getElementById("maxPrice").value = "";
+    document.getElementById("sortBy").value = "newest";
+    
+    // NEW: Clear fabric checkboxes
+    document.querySelectorAll('input[name="fabric"]').forEach(cb => cb.checked = false);
+    
+    // NEW: Clear stock checkbox
+    document.getElementById("inStockOnly").checked = false;
+
+    loadCollections();
+    loadProducts();
+    closeDrawer();
+  });
+
+  // Init
+  loadCollections();
+  loadProducts();
+</script>
+
+</body>
+</html>
