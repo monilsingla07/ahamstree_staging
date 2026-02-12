@@ -2,22 +2,22 @@
 <html>
 <head>
   <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-CKQ1EXBHY6"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CKQ1EXBHY6"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-CKQ1EXBHY6');
+  </script>
 
-  gtag('config', 'G-CKQ1EXBHY6');
-</script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Checkout — AhamStree</title>
   <meta name="description" content="Secure checkout. Shipping details and Razorpay payment." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/styles.css" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css" />
 </head>
 
 <body>
@@ -121,7 +121,6 @@
           <div id="couponMsg" class="small" style="margin-top:6px; opacity:.85;"></div>
         </div>
 
-
         <div style="height:12px;"></div>
         <div style="border-top:1px solid rgba(255,255,255,.08); padding-top:12px;">
           <div style="display:flex; justify-content:space-between; gap:10px;">
@@ -156,547 +155,550 @@
   </div>
 
   <div id="footer"></div>
-<script type="module">
-  const statusEl = document.getElementById("status");
-  const warnBox = document.getElementById("warn");
-  const warnText = document.getElementById("warnText");
-  const payBtn = document.getElementById("payBtn");
-  const form = document.getElementById("form");
 
-  const showError = (msg) => {
-    warnBox.style.display = "block";
-    warnText.textContent = msg;
-  };
-  const clearError = () => {
-    warnBox.style.display = "none";
-    warnText.textContent = "";
-  };
-
-  // ---------- Money / Summary ----------
-  // Fallback only. Server (quote-order) should be the source of truth.
-  const GST_RATE = 0.05; // fallback only
-  const GST_INCLUDED_IN_PRICE = true; // fallback only ("inclusive of all taxes")
-
-  let cartOk = true; // disables Pay if stock is not available
-  let appliedCoupon = localStorage.getItem("ahamstree_coupon") || "";
-
-  function money(n) {
-    const num = Number(n || 0);
-    return "₹" + num.toLocaleString("en-IN", { maximumFractionDigits: 0 });
-  }
-
-  function calcGST(netTotal) {
-    const rate = Number(GST_RATE || 0);
-    const net = Number(netTotal || 0);
-
-    if (!rate || rate <= 0) return { gst: 0, taxable: net };
-
-    if (GST_INCLUDED_IN_PRICE) {
-      const taxable = net / (1 + rate);
-      const gst = net - taxable;
-      return { gst, taxable };
-    }
-
-    const gst = net * rate;
-    return { gst, taxable: net };
-  }
-
-async function tryServerQuote({ cart, coupon_code }) {
-  try {
-    const sbMod = await import("./assets/supabase.js");
-
-    // Add Authorization header only if user is logged in
-    const { data: sess } = await sbMod.supabase.auth.getSession();
-    const token = sess?.session?.access_token;
-
-    const { data, error } = await sbMod.supabase.functions.invoke("quote-order", {
-      body: { cart, coupon_code },
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
-    });
-
-    if (error) {
-      return { ok: false, error: error.message || "Quote error", details: error };
-    }
-    if (!data) return { ok: false, error: "No quote returned" };
-    return { ok: true, data };
-  } catch (e) {
-    return { ok: fa
-::contentReference[oaicite:0]{index=0}
-
-  async function renderOrderSummary({ coupon_code = "" } = {}) {
-    const summaryItems = document.getElementById("summaryItems");
-    const subtotalEl = document.getElementById("subtotal");
-    const shippingEl = document.getElementById("shipping");
-    const totalEl = document.getElementById("total");
-
-    const discountRow = document.getElementById("discountRow");
-    const discountEl = document.getElementById("discount");
-    const gstEl = document.getElementById("gst");
-    const gstLabel = document.getElementById("gstLabel");
-
-    const couponInput = document.getElementById("couponInput");
-    const couponMsg = document.getElementById("couponMsg");
-
-    if (!summaryItems || !subtotalEl || !shippingEl || !totalEl) return;
-
-    const cartMod = await import("./assets/cart.js");
-    const sbMod = await import("./assets/supabase.js");
-
-    const items = cartMod.getCart?.() || [];
-    cartOk = true;
-
-    if (couponInput && coupon_code !== undefined) {
-      couponInput.value = String(coupon_code || "");
-    }
-
-    if (!items.length) {
-      summaryItems.innerHTML = `<div class="small" style="opacity:.75;">Your cart is empty.</div>`;
-      subtotalEl.textContent = money(0);
-      shippingEl.textContent = money(0);
-      totalEl.textContent = money(0);
-      if (discountRow) discountRow.style.display = "none";
-      if (gstEl) gstEl.textContent = money(0);
-      if (gstLabel) gstLabel.textContent = GST_INCLUDED_IN_PRICE ? "GST (included)" : "GST";
-      if (couponMsg) couponMsg.textContent = "";
-      cartOk = false;
-      validateAll({ showErrors: false });
-      return;
-    }
-
-    // Fetch latest product info (stock + price)
-    // IMPORTANT: include reserved_qty so we can compute available = inventory - reserved
-    const ids = Array.from(new Set(items.map(i => String(i.product_id))));
-    const { data: products, error: prodErr } = await sbMod.supabase
-      .from("products")
-      .select("id,title,price_inr,sale_price_inr,inventory_qty,reserved_qty,is_active, product_images(image_url, sort_order)")
-      .in("id", ids);
-
-    if (prodErr) {
-      cartOk = false;
-      showError("Could not verify product stock. Please refresh and try again.");
-    }
-
-    const pMap = new Map((products || []).map(p => [String(p.id), p]));
-
-    let subtotal = 0;
-    let hasStockIssue = false;
-
-    summaryItems.innerHTML = items.map((i) => {
-      const pid = String(i.product_id);
-      const p = pMap.get(pid);
-
-      const active = p?.is_active !== false;
-
-      const inv = Number(p?.inventory_qty ?? 0);
-      const reserved = Number(p?.reserved_qty ?? 0);
-      const available = Math.max(inv - reserved, 0);
-
-      const qty = Number(i.qty || 1);
-
-      const okStock = !!p && active && available > 0 && qty <= available;
-      if (!okStock) hasStockIssue = true;
-
-      // Price rule: if sale_price_inr is set, use it; else use price_inr
-      const unitPrice = Number(
-        (p?.sale_price_inr !== null && p?.sale_price_inr !== undefined)
-          ? p.sale_price_inr
-          : (p?.price_inr ?? i.price_inr ?? 0)
-      );
-
-      const lineTotal = unitPrice * qty;
-      subtotal += lineTotal;
-
-      const imgUrl = (() => {
-        const imgs = (p?.product_images ?? []).slice().sort((a,b)=> (a.sort_order??0)-(b.sort_order??0));
-        return imgs[0]?.image_url || i.image_url || "";
-      })();
-
-      const title = p?.title || i.title || "Item";
-
-      let stockText = "";
-      if (!p) stockText = "Unavailable";
-      else if (!active || available <= 0) stockText = "Sold out";
-      else if (qty > available) stockText = `Only ${available} left`;
-
-      return `
-        <div style="display:flex; gap:10px; align-items:center;">
-          <div style="width:54px;height:64px;border-radius:12px;overflow:hidden;background:#fafafa;flex:0 0 auto;">
-            ${imgUrl ? `<img src="${imgUrl}" alt="${title}" style="width:100%;height:100%;object-fit:cover;">` : ""}
-          </div>
-
-          <div style="flex:1; min-width:0;">
-            <div style="font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-              ${title}
-            </div>
-            <div class="small" style="opacity:.75;">${money(unitPrice)} × ${qty}</div>
-            ${stockText ? `<div class="small" style="color:crimson; margin-top:2px;">${stockText}</div>` : ""}
-          </div>
-
-          <div style="font-weight:900; flex:0 0 auto;">${money(lineTotal)}</div>
-        </div>
-      `;
-    }).join("");
-
-    if (hasStockIssue) {
-      cartOk = false;
-      showError("Some items are sold out / exceed available stock. Please go back and edit your cart.");
-    } else {
-      clearError();
-    }
-
-    let shipping = 0; // free shipping for now (can be replaced by server value)
-    let discount = 0;
-    let gst = calcGST(subtotal - discount + shipping).gst;
-
-    // Default total (fallback)
-    let total = GST_INCLUDED_IN_PRICE
-      ? (subtotal - discount + shipping)
-      : (subtotal - discount + shipping + gst);
-
-    const code = String(coupon_code || "").trim().toUpperCase();
-    const payloadCart = items.map(i => ({ product_id: i.product_id, qty: i.qty }));
-
-    // Try server quote ALWAYS (works even without coupon, gives GST breakdown correctly)
-    const q = await tryServerQuote({ cart: payloadCart, coupon_code: code || null });
-
-    if (q.ok && q.data) {
-      // Use server totals
-      subtotal = Number(q.data.subtotal_inr ?? subtotal);
-      discount = Number(q.data.discount_inr ?? 0);
-      shipping = Number(q.data.shipping_inr ?? shipping);
-      gst = Number(q.data.gst_inr ?? gst);
-      total = Number(q.data.total_inr ?? total);
-
-      // GST label from server (preferred)
-      if (gstLabel) gstLabel.textContent = q.data.gst_included ? "GST (included)" : "GST";
-
-      // Coupon messaging from server
-      if (couponMsg) {
-        if (code) {
-          const c = q.data.coupon;
-          if (c?.ok) couponMsg.textContent = `Applied: ${code}`;
-          else couponMsg.textContent = c?.message || "Coupon not applied";
-        } else {
-          couponMsg.textContent = "";
-        }
-      }
-
-      // If server detected stock issues, block payment too
-      if (Array.isArray(q.data.issues) && q.data.issues.length) {
-        cartOk = false;
-        showError(q.data.issues.join(" • "));
-      }
-    } else {
-      // Fallback label + coupon message when quote-order not deployed
-      if (gstLabel) gstLabel.textContent = GST_INCLUDED_IN_PRICE ? "GST (included)" : "GST";
-
-      if (couponMsg) {
-    const details = q?.error ? ` (${q.error})` : "";
-    couponMsg.textContent = code
-      ? `Coupon preview not available yet. Please check quote-order deployment/secrets.${details}`
-      : "";
-  }
-    }
-
-    // Update GST display
-    if (gstEl) gstEl.textContent = money(gst);
-
-    // Discount row
-    if (discountRow && discountEl) {
-      if (discount > 0) {
-        discountRow.style.display = "flex";
-        discountEl.textContent = "-" + money(discount);
-      } else {
-        discountRow.style.display = "none";
-        discountEl.textContent = "-" + money(0);
-      }
-    }
-
-    subtotalEl.textContent = money(subtotal);
-    shippingEl.textContent = money(shipping);
-    totalEl.textContent = money(total);
-
-    validateAll({ showErrors: false });
-  }
-
-  // ---------- Validation ----------
-  const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email);
-  const sanitizeText = (s) => String(s || "").trim().replace(/\s+/g, " ");
-
-  const normalizePhone10 = (raw) => {
-    let digits = String(raw || "").replace(/\D/g, "");
-    if (digits.startsWith("91") && digits.length === 12) digits = digits.slice(2);
-    if (digits.startsWith("0") && digits.length === 11) digits = digits.slice(1);
-    return digits;
-  };
-
-  const normalizePincode6 = (raw) => String(raw || "").replace(/\D/g, "");
-
-  const markInvalid = (inputEl, msg) => {
-    inputEl.classList.add("is-invalid");
-    inputEl.dataset.error = msg;
-  };
-  const markValid = (inputEl) => {
-    inputEl.classList.remove("is-invalid");
-    delete inputEl.dataset.error;
-  };
-  const clearMarks = (inputEl) => {
-    inputEl.classList.remove("is-invalid");
-    delete inputEl.dataset.error;
-  };
-
-  const validateField = (name, valueRaw) => {
-    const v = valueRaw;
-
-    if (name === "full_name") {
-      const full = sanitizeText(v);
-      if (!full || full.length < 3) return { ok: false, message: "Enter a valid full name (min 3 chars)." };
-      return { ok: true };
-    }
-
-    if (name === "phone") {
-      const phone10 = normalizePhone10(v);
-      if (!phone10 || phone10.length !== 10 || !/^[6-9]\d{9}$/.test(phone10)) {
-        return { ok: false, message: "Enter a valid 10-digit Indian mobile (starts 6–9)." };
-      }
-      return { ok: true };
-    }
-
-    if (name === "email") {
-      const email = sanitizeText(v).toLowerCase();
-      if (!email) return { ok: true };
-      if (!isValidEmail(email)) return { ok: false, message: "Enter a valid email or leave blank." };
-      return { ok: true };
-    }
-
-    if (name === "address_line1") {
-      const a1 = sanitizeText(v);
-      if (!a1 || a1.length < 5) return { ok: false, message: "Enter Address line 1 (min 5 chars)." };
-      return { ok: true };
-    }
-
-    if (name === "city") {
-      const city = sanitizeText(v);
-      if (!city) return { ok: false, message: "Enter your city." };
-      return { ok: true };
-    }
-
-    if (name === "state") {
-      const state = sanitizeText(v);
-      if (!state) return { ok: false, message: "Enter your state." };
-      return { ok: true };
-    }
-
-    if (name === "pincode") {
-      const pin = normalizePincode6(v);
-      if (!pin || pin.length !== 6) return { ok: false, message: "Enter a valid 6-digit pincode." };
-      return { ok: true };
-    }
-
-    return { ok: true };
-  };
-
-  const requiredFields = ["full_name", "phone", "address_line1", "city", "state", "pincode"];
-
-  const validateAll = ({ showErrors = false } = {}) => {
-    let allOk = true;
-    let firstError = null;
-
-    const inputs = form.querySelectorAll("input[name]");
-    inputs.forEach((input) => {
-      const name = input.name;
-      const res = validateField(name, input.value);
-      const isRequired = requiredFields.includes(name);
-
-      if ((isRequired || name === "email") && !res.ok) {
-        allOk = false;
-
-        if (showErrors || input.dataset.touched === "1") {
-          markInvalid(input, res.message);
-        } else {
-          clearMarks(input);
-        }
-
-        if (!firstError) firstError = res.message;
-      } else {
-        if (!isRequired && name !== "email" && input.value.trim() === "") clearMarks(input);
-        else if (name === "email" && input.value.trim() === "") clearMarks(input);
-        else markValid(input);
-      }
-    });
-
-    const canPay = allOk && cartOk;
-    payBtn.disabled = !canPay;
-    payBtn.style.opacity = canPay ? "1" : "0.6";
-    payBtn.style.cursor = canPay ? "pointer" : "not-allowed";
-
-    if (showErrors) {
-      if (!allOk && firstError) showError(firstError);
-      else clearError();
-    }
-
-    return (allOk && cartOk);
-  };
-
-  const attachLiveValidation = () => {
-    const inputs = form.querySelectorAll("input[name]");
-    inputs.forEach((input) => {
-      const name = input.name;
-
-      input.addEventListener("input", () => {
-        if (name === "phone") input.value = String(input.value || "").replace(/\D/g, "").slice(0, 10);
-        if (name === "pincode") input.value = String(input.value || "").replace(/\D/g, "").slice(0, 6);
-        validateAll({ showErrors: false });
-      });
-
-      input.addEventListener("blur", () => {
-        input.dataset.touched = "1";
-        validateAll({ showErrors: false });
-
-        const res = validateField(name, input.value);
-        const isRequired = requiredFields.includes(name);
-        if ((isRequired || name === "email") && !res.ok) showError(res.message);
-        else clearError();
-      });
-    });
-  };
-
-  // ---------- Build payload ----------
-  const buildShipping = () => {
-    const fd = new FormData(form);
-    const raw = Object.fromEntries(fd.entries());
-
-    const full_name = sanitizeText(raw.full_name);
-    const phone10 = normalizePhone10(raw.phone);
-    const email = sanitizeText(raw.email).toLowerCase();
-    const address_line1 = sanitizeText(raw.address_line1);
-    const address_line2 = sanitizeText(raw.address_line2);
-    const city = sanitizeText(raw.city);
-    const state = sanitizeText(raw.state);
-    const pincode = normalizePincode6(raw.pincode);
-
-    return {
-      full_name,
-      phone: phone10,
-      email: email || null,
-      address_line1,
-      address_line2: address_line2 || null,
-      city,
-      state,
-      pincode
+  <script type="module">
+    const statusEl = document.getElementById("status");
+    const warnBox = document.getElementById("warn");
+    const warnText = document.getElementById("warnText");
+    const payBtn = document.getElementById("payBtn");
+    const form = document.getElementById("form");
+
+    const showError = (msg) => {
+      warnBox.style.display = "block";
+      warnText.textContent = msg;
     };
-  };
+    const clearError = () => {
+      warnBox.style.display = "none";
+      warnText.textContent = "";
+    };
 
-  // ---------- Init ----------
-  statusEl.textContent = "";
+    // ---------- Money / Summary ----------
+    // Fallback only. Server (quote-order) should be the source of truth.
+    const GST_RATE = 0.05; // fallback only
+    const GST_INCLUDED_IN_PRICE = true; // fallback only ("inclusive of all taxes")
 
-  // Coupon UI
-  const couponInput = document.getElementById("couponInput");
-  const applyCouponBtn = document.getElementById("applyCoupon");
+    let cartOk = true; // disables Pay if stock is not available
+    let appliedCoupon = localStorage.getItem("ahamstree_coupon") || "";
 
-  if (couponInput) couponInput.value = appliedCoupon;
-
-  const applyCouponNow = async () => {
-    const code = String(couponInput?.value || "").trim().toUpperCase();
-    appliedCoupon = code;
-    localStorage.setItem("ahamstree_coupon", appliedCoupon);
-    await renderOrderSummary({ coupon_code: appliedCoupon });
-  };
-
-  applyCouponBtn?.addEventListener("click", applyCouponNow);
-  couponInput?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      applyCouponNow();
+    function money(n) {
+      const num = Number(n || 0);
+      return "₹" + num.toLocaleString("en-IN", { maximumFractionDigits: 0 });
     }
-  });
 
-  // First render
-  renderOrderSummary({ coupon_code: appliedCoupon });
-  attachLiveValidation();
-  validateAll({ showErrors: false });
+    function calcGST(netTotal) {
+      const rate = Number(GST_RATE || 0);
+      const net = Number(netTotal || 0);
 
-  // ---------- Pay ----------
-  let isProcessing = false;
+      if (!rate || rate <= 0) return { gst: 0, taxable: net };
 
-  payBtn.addEventListener("click", async () => {
-    form.querySelectorAll("input[name]").forEach(i => (i.dataset.touched = "1"));
-    const ok = validateAll({ showErrors: true });
-    if (!ok) return;
+      if (GST_INCLUDED_IN_PRICE) {
+        const taxable = net / (1 + rate);
+        const gst = net - taxable;
+        return { gst, taxable };
+      }
 
-    if (isProcessing) return;
+      const gst = net * rate;
+      return { gst, taxable: net };
+    }
 
-    try {
-      isProcessing = true;
-      payBtn.disabled = true;
-      payBtn.textContent = "Processing…";
-      clearError();
-      statusEl.textContent = "Creating payment…";
+    // ✅ FIXED: complete function (your earlier paste got cut and broke the script)
+    async function tryServerQuote({ cart, coupon_code }) {
+      try {
+        const sbMod = await import("./assets/supabase.js");
+
+        // Add Authorization header only if user is logged in
+        const { data: sess } = await sbMod.supabase.auth.getSession();
+        const token = sess?.session?.access_token;
+
+        const { data, error } = await sbMod.supabase.functions.invoke("quote-order", {
+          body: { cart, coupon_code },
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+
+        if (error) {
+          return { ok: false, error: error.message || "Quote error", details: error };
+        }
+        if (!data) return { ok: false, error: "No quote returned" };
+        return { ok: true, data };
+      } catch (e) {
+        return { ok: false, error: String(e?.message ?? e) };
+      }
+    }
+
+    async function renderOrderSummary({ coupon_code = "" } = {}) {
+      const summaryItems = document.getElementById("summaryItems");
+      const subtotalEl = document.getElementById("subtotal");
+      const shippingEl = document.getElementById("shipping");
+      const totalEl = document.getElementById("total");
+
+      const discountRow = document.getElementById("discountRow");
+      const discountEl = document.getElementById("discount");
+      const gstEl = document.getElementById("gst");
+      const gstLabel = document.getElementById("gstLabel");
+
+      const couponInput = document.getElementById("couponInput");
+      const couponMsg = document.getElementById("couponMsg");
+
+      if (!summaryItems || !subtotalEl || !shippingEl || !totalEl) return;
 
       const cartMod = await import("./assets/cart.js");
       const sbMod = await import("./assets/supabase.js");
 
-      const cart = cartMod.getCart?.() || [];
-      if (!cart.length) {
-        showError("Your cart is empty. Please add products first.");
-        statusEl.textContent = "";
+      const items = cartMod.getCart?.() || [];
+      cartOk = true;
+
+      if (couponInput && coupon_code !== undefined) {
+        couponInput.value = String(coupon_code || "");
+      }
+
+      if (!items.length) {
+        summaryItems.innerHTML = `<div class="small" style="opacity:.75;">Your cart is empty.</div>`;
+        subtotalEl.textContent = money(0);
+        shippingEl.textContent = money(0);
+        totalEl.textContent = money(0);
+        if (discountRow) discountRow.style.display = "none";
+        if (gstEl) gstEl.textContent = money(0);
+        if (gstLabel) gstLabel.textContent = GST_INCLUDED_IN_PRICE ? "GST (included)" : "GST";
+        if (couponMsg) couponMsg.textContent = "";
+        cartOk = false;
+        validateAll({ showErrors: false });
         return;
       }
 
-      // Must be logged in (your create-payment-link function requires it)
-      const { data: sess } = await sbMod.supabase.auth.getSession();
-      const session = sess?.session;
-      if (!session?.access_token) {
-        showError("You are not logged in. Please login before paying.");
-        statusEl.textContent = "";
-        return;
+      // Fetch latest product info (stock + price)
+      // IMPORTANT: include reserved_qty so we can compute available = inventory - reserved
+      const ids = Array.from(new Set(items.map(i => String(i.product_id))));
+      const { data: products, error: prodErr } = await sbMod.supabase
+        .from("products")
+        .select("id,title,price_inr,sale_price_inr,inventory_qty,reserved_qty,is_active, product_images(image_url, sort_order)")
+        .in("id", ids);
+
+      if (prodErr) {
+        cartOk = false;
+        showError("Could not verify product stock. Please refresh and try again.");
       }
 
-      const shipping = buildShipping();
-      const payloadCart = cart.map(i => ({ product_id: i.product_id, qty: i.qty }));
+      const pMap = new Map((products || []).map(p => [String(p.id), p]));
 
-      // IMPORTANT: Match create-payment-link function expected fields
-  const { data, error } = await sbMod.supabase.functions.invoke("create-payment-link", {
-  body: {
-    cart: payloadCart,
-    coupon_code: (appliedCoupon || null),
-    customer_name: shipping.full_name,
-    customer_phone: shipping.phone,
-    customer_email: shipping.email || null,
-    shipping_address: shipping,
-    shipping_inr: 0
-  },
-  headers: {
-    Authorization: `Bearer ${session.access_token}`
-  }
-});
+      let subtotal = 0;
+      let hasStockIssue = false;
 
-      if (error) {
-        showError(error.message || "Payment setup failed. Please try again.");
-        statusEl.textContent = "";
-        return;
+      summaryItems.innerHTML = items.map((i) => {
+        const pid = String(i.product_id);
+        const p = pMap.get(pid);
+
+        const active = p?.is_active !== false;
+
+        const inv = Number(p?.inventory_qty ?? 0);
+        const reserved = Number(p?.reserved_qty ?? 0);
+        const available = Math.max(inv - reserved, 0);
+
+        const qty = Number(i.qty || 1);
+
+        const okStock = !!p && active && available > 0 && qty <= available;
+        if (!okStock) hasStockIssue = true;
+
+        // Price rule: if sale_price_inr is set, use it; else use price_inr
+        const unitPrice = Number(
+          (p?.sale_price_inr !== null && p?.sale_price_inr !== undefined)
+            ? p.sale_price_inr
+            : (p?.price_inr ?? i.price_inr ?? 0)
+        );
+
+        const lineTotal = unitPrice * qty;
+        subtotal += lineTotal;
+
+        const imgUrl = (() => {
+          const imgs = (p?.product_images ?? []).slice().sort((a,b)=> (a.sort_order??0)-(b.sort_order??0));
+          return imgs[0]?.image_url || i.image_url || "";
+        })();
+
+        const title = p?.title || i.title || "Item";
+
+        let stockText = "";
+        if (!p) stockText = "Unavailable";
+        else if (!active || available <= 0) stockText = "Sold out";
+        else if (qty > available) stockText = `Only ${available} left`;
+
+        return `
+          <div style="display:flex; gap:10px; align-items:center;">
+            <div style="width:54px;height:64px;border-radius:12px;overflow:hidden;background:#fafafa;flex:0 0 auto;">
+              ${imgUrl ? `<img src="${imgUrl}" alt="${title}" style="width:100%;height:100%;object-fit:cover;">` : ""}
+            </div>
+
+            <div style="flex:1; min-width:0;">
+              <div style="font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                ${title}
+              </div>
+              <div class="small" style="opacity:.75;">${money(unitPrice)} × ${qty}</div>
+              ${stockText ? `<div class="small" style="color:crimson; margin-top:2px;">${stockText}</div>` : ""}
+            </div>
+
+            <div style="font-weight:900; flex:0 0 auto;">${money(lineTotal)}</div>
+          </div>
+        `;
+      }).join("");
+
+      if (hasStockIssue) {
+        cartOk = false;
+        showError("Some items are sold out / exceed available stock. Please go back and edit your cart.");
+      } else {
+        clearError();
       }
 
-      if (!data?.payment_link_url) {
-        showError(data?.error || "Payment setup failed. Please try again.");
-        statusEl.textContent = "";
-        return;
+      let shipping = 0; // free shipping for now (can be replaced by server value)
+      let discount = 0;
+      let gst = calcGST(subtotal - discount + shipping).gst;
+
+      // Default total (fallback)
+      let total = GST_INCLUDED_IN_PRICE
+        ? (subtotal - discount + shipping)
+        : (subtotal - discount + shipping + gst);
+
+      const code = String(coupon_code || "").trim().toUpperCase();
+      const payloadCart = items.map(i => ({ product_id: i.product_id, qty: i.qty }));
+
+      // Try server quote ALWAYS (works even without coupon, gives GST breakdown correctly)
+      const q = await tryServerQuote({ cart: payloadCart, coupon_code: code || null });
+
+      if (q.ok && q.data) {
+        // Use server totals
+        subtotal = Number(q.data.subtotal_inr ?? subtotal);
+        discount = Number(q.data.discount_inr ?? 0);
+        shipping = Number(q.data.shipping_inr ?? shipping);
+        gst = Number(q.data.gst_inr ?? gst);
+        total = Number(q.data.total_inr ?? total);
+
+        // GST label from server (preferred)
+        if (gstLabel) gstLabel.textContent = q.data.gst_included ? "GST (included)" : "GST";
+
+        // Coupon messaging from server
+        if (couponMsg) {
+          if (code) {
+            const c = q.data.coupon;
+            if (c?.ok) couponMsg.textContent = `Applied: ${code}`;
+            else couponMsg.textContent = c?.message || "Coupon not applied";
+          } else {
+            couponMsg.textContent = "";
+          }
+        }
+
+        // If server detected stock issues, block payment too
+        if (Array.isArray(q.data.issues) && q.data.issues.length) {
+          cartOk = false;
+          showError(q.data.issues.join(" • "));
+        }
+      } else {
+        // Fallback label + coupon message when quote-order not deployed
+        if (gstLabel) gstLabel.textContent = GST_INCLUDED_IN_PRICE ? "GST (included)" : "GST";
+
+        if (couponMsg) {
+          const details = q?.error ? ` (${q.error})` : "";
+          couponMsg.textContent = code
+            ? `Coupon preview not available yet. Please check quote-order deployment/secrets.${details}`
+            : "";
+        }
       }
 
-      statusEl.textContent = "Redirecting to Razorpay…";
-      window.location.href = data.payment_link_url;
+      // Update GST display
+      if (gstEl) gstEl.textContent = money(gst);
 
-    } catch (e) {
-      showError(String(e?.message ?? e));
-      statusEl.textContent = "";
-      console.error(e);
-    } finally {
-      isProcessing = false;
-      payBtn.textContent = "Pay with Razorpay";
+      // Discount row
+      if (discountRow && discountEl) {
+        if (discount > 0) {
+          discountRow.style.display = "flex";
+          discountEl.textContent = "-" + money(discount);
+        } else {
+          discountRow.style.display = "none";
+          discountEl.textContent = "-" + money(0);
+        }
+      }
+
+      subtotalEl.textContent = money(subtotal);
+      shippingEl.textContent = money(shipping);
+      totalEl.textContent = money(total);
+
       validateAll({ showErrors: false });
     }
-  });
-</script>
- 
+
+    // ---------- Validation ----------
+    const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email);
+    const sanitizeText = (s) => String(s || "").trim().replace(/\s+/g, " ");
+
+    const normalizePhone10 = (raw) => {
+      let digits = String(raw || "").replace(/\D/g, "");
+      if (digits.startsWith("91") && digits.length === 12) digits = digits.slice(2);
+      if (digits.startsWith("0") && digits.length === 11) digits = digits.slice(1);
+      return digits;
+    };
+
+    const normalizePincode6 = (raw) => String(raw || "").replace(/\D/g, "");
+
+    const markInvalid = (inputEl, msg) => {
+      inputEl.classList.add("is-invalid");
+      inputEl.dataset.error = msg;
+    };
+    const markValid = (inputEl) => {
+      inputEl.classList.remove("is-invalid");
+      delete inputEl.dataset.error;
+    };
+    const clearMarks = (inputEl) => {
+      inputEl.classList.remove("is-invalid");
+      delete inputEl.dataset.error;
+    };
+
+    const validateField = (name, valueRaw) => {
+      const v = valueRaw;
+
+      if (name === "full_name") {
+        const full = sanitizeText(v);
+        if (!full || full.length < 3) return { ok: false, message: "Enter a valid full name (min 3 chars)." };
+        return { ok: true };
+      }
+
+      if (name === "phone") {
+        const phone10 = normalizePhone10(v);
+        if (!phone10 || phone10.length !== 10 || !/^[6-9]\d{9}$/.test(phone10)) {
+          return { ok: false, message: "Enter a valid 10-digit Indian mobile (starts 6–9)." };
+        }
+        return { ok: true };
+      }
+
+      if (name === "email") {
+        const email = sanitizeText(v).toLowerCase();
+        if (!email) return { ok: true };
+        if (!isValidEmail(email)) return { ok: false, message: "Enter a valid email or leave blank." };
+        return { ok: true };
+      }
+
+      if (name === "address_line1") {
+        const a1 = sanitizeText(v);
+        if (!a1 || a1.length < 5) return { ok: false, message: "Enter Address line 1 (min 5 chars)." };
+        return { ok: true };
+      }
+
+      if (name === "city") {
+        const city = sanitizeText(v);
+        if (!city) return { ok: false, message: "Enter your city." };
+        return { ok: true };
+      }
+
+      if (name === "state") {
+        const state = sanitizeText(v);
+        if (!state) return { ok: false, message: "Enter your state." };
+        return { ok: true };
+      }
+
+      if (name === "pincode") {
+        const pin = normalizePincode6(v);
+        if (!pin || pin.length !== 6) return { ok: false, message: "Enter a valid 6-digit pincode." };
+        return { ok: true };
+      }
+
+      return { ok: true };
+    };
+
+    const requiredFields = ["full_name", "phone", "address_line1", "city", "state", "pincode"];
+
+    const validateAll = ({ showErrors = false } = {}) => {
+      let allOk = true;
+      let firstError = null;
+
+      const inputs = form.querySelectorAll("input[name]");
+      inputs.forEach((input) => {
+        const name = input.name;
+        const res = validateField(name, input.value);
+        const isRequired = requiredFields.includes(name);
+
+        if ((isRequired || name === "email") && !res.ok) {
+          allOk = false;
+
+          if (showErrors || input.dataset.touched === "1") {
+            markInvalid(input, res.message);
+          } else {
+            clearMarks(input);
+          }
+
+          if (!firstError) firstError = res.message;
+        } else {
+          if (!isRequired && name !== "email" && input.value.trim() === "") clearMarks(input);
+          else if (name === "email" && input.value.trim() === "") clearMarks(input);
+          else markValid(input);
+        }
+      });
+
+      const canPay = allOk && cartOk;
+      payBtn.disabled = !canPay;
+      payBtn.style.opacity = canPay ? "1" : "0.6";
+      payBtn.style.cursor = canPay ? "pointer" : "not-allowed";
+
+      if (showErrors) {
+        if (!allOk && firstError) showError(firstError);
+        else clearError();
+      }
+
+      return (allOk && cartOk);
+    };
+
+    const attachLiveValidation = () => {
+      const inputs = form.querySelectorAll("input[name]");
+      inputs.forEach((input) => {
+        const name = input.name;
+
+        input.addEventListener("input", () => {
+          if (name === "phone") input.value = String(input.value || "").replace(/\D/g, "").slice(0, 10);
+          if (name === "pincode") input.value = String(input.value || "").replace(/\D/g, "").slice(0, 6);
+          validateAll({ showErrors: false });
+        });
+
+        input.addEventListener("blur", () => {
+          input.dataset.touched = "1";
+          validateAll({ showErrors: false });
+
+          const res = validateField(name, input.value);
+          const isRequired = requiredFields.includes(name);
+          if ((isRequired || name === "email") && !res.ok) showError(res.message);
+          else clearError();
+        });
+      });
+    };
+
+    // ---------- Build payload ----------
+    const buildShipping = () => {
+      const fd = new FormData(form);
+      const raw = Object.fromEntries(fd.entries());
+
+      const full_name = sanitizeText(raw.full_name);
+      const phone10 = normalizePhone10(raw.phone);
+      const email = sanitizeText(raw.email).toLowerCase();
+      const address_line1 = sanitizeText(raw.address_line1);
+      const address_line2 = sanitizeText(raw.address_line2);
+      const city = sanitizeText(raw.city);
+      const state = sanitizeText(raw.state);
+      const pincode = normalizePincode6(raw.pincode);
+
+      return {
+        full_name,
+        phone: phone10,
+        email: email || null,
+        address_line1,
+        address_line2: address_line2 || null,
+        city,
+        state,
+        pincode
+      };
+    };
+
+    // ---------- Init ----------
+    statusEl.textContent = "";
+
+    // Coupon UI
+    const couponInput = document.getElementById("couponInput");
+    const applyCouponBtn = document.getElementById("applyCoupon");
+
+    if (couponInput) couponInput.value = appliedCoupon;
+
+    const applyCouponNow = async () => {
+      const code = String(couponInput?.value || "").trim().toUpperCase();
+      appliedCoupon = code;
+      localStorage.setItem("ahamstree_coupon", appliedCoupon);
+      await renderOrderSummary({ coupon_code: appliedCoupon });
+    };
+
+    applyCouponBtn?.addEventListener("click", applyCouponNow);
+    couponInput?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        applyCouponNow();
+      }
+    });
+
+    // First render
+    renderOrderSummary({ coupon_code: appliedCoupon });
+    attachLiveValidation();
+    validateAll({ showErrors: false });
+
+    // ---------- Pay ----------
+    let isProcessing = false;
+
+    payBtn.addEventListener("click", async () => {
+      form.querySelectorAll("input[name]").forEach(i => (i.dataset.touched = "1"));
+      const ok = validateAll({ showErrors: true });
+      if (!ok) return;
+
+      if (isProcessing) return;
+
+      try {
+        isProcessing = true;
+        payBtn.disabled = true;
+        payBtn.textContent = "Processing…";
+        clearError();
+        statusEl.textContent = "Creating payment…";
+
+        const cartMod = await import("./assets/cart.js");
+        const sbMod = await import("./assets/supabase.js");
+
+        const cart = cartMod.getCart?.() || [];
+        if (!cart.length) {
+          showError("Your cart is empty. Please add products first.");
+          statusEl.textContent = "";
+          return;
+        }
+
+        // Must be logged in (your create-payment-link function requires it)
+        const { data: sess } = await sbMod.supabase.auth.getSession();
+        const session = sess?.session;
+        if (!session?.access_token) {
+          showError("You are not logged in. Please login before paying.");
+          statusEl.textContent = "";
+          return;
+        }
+
+        const shipping = buildShipping();
+        const payloadCart = cart.map(i => ({ product_id: i.product_id, qty: i.qty }));
+
+        // IMPORTANT: Match create-payment-link function expected fields
+        const { data, error } = await sbMod.supabase.functions.invoke("create-payment-link", {
+          body: {
+            cart: payloadCart,
+            coupon_code: (appliedCoupon || null),
+            customer_name: shipping.full_name,
+            customer_phone: shipping.phone,
+            customer_email: shipping.email || null,
+            shipping_address: shipping,
+            shipping_inr: 0
+          },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          }
+        });
+
+        if (error) {
+          showError(error.message || "Payment setup failed. Please try again.");
+          statusEl.textContent = "";
+          return;
+        }
+
+        if (!data?.payment_link_url) {
+          showError(data?.error || "Payment setup failed. Please try again.");
+          statusEl.textContent = "";
+          return;
+        }
+
+        statusEl.textContent = "Redirecting to Razorpay…";
+        window.location.href = data.payment_link_url;
+
+      } catch (e) {
+        showError(String(e?.message ?? e));
+        statusEl.textContent = "";
+        console.error(e);
+      } finally {
+        isProcessing = false;
+        payBtn.textContent = "Pay with Razorpay";
+        validateAll({ showErrors: false });
+      }
+    });
+  </script>
+
 </body>
 </html>
