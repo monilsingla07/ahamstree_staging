@@ -209,7 +209,10 @@
         body: { cart, coupon_code }
       });
 
-      if (error) return { ok: false, error: error.message || "Quote error" };
+    if (error) {
+  // show the actual response body if Supabase provides it
+  return { ok: false, error: error.message || "Quote error", details: error };
+}
       if (!data) return { ok: false, error: "No quote returned" };
       return { ok: true, data };
     } catch (e) {
