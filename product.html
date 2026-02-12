@@ -149,7 +149,7 @@
       // 1) Product + images (you already had this)
       const { data, error } = await supabase
         .from("products")
-        .select("id,title,description,price_inr,sale_price_inr,sku,inventory_qty,is_active, product_images(image_url, sort_order, alt_text)")
+        .select("id,title,description,price_inr,sale_price_inr,sku,inventory_qty,reserved_qty,is_active, product_images(image_url, sort_order, alt_text)")
         .eq("id", id)
         .maybeSingle();
 
@@ -176,8 +176,10 @@
       skuEl.textContent = data.sku ? `SKU: ${data.sku}` : "";
 
       const inv = safeNum(data.inventory_qty, 0);
+      const reserved = safeNum(data.reserved_qty, 0);
+      const available = Math.max(0, inv - reserved);
       const stockEl = document.getElementById("stock");
-      stockEl.textContent = inv > 0 ? `${inv} available` : "Sold out";
+      stockEl.textContent = available > 0 ? `${available} available` : "Sold out";
 
       // Price: show sale if present
       const priceEl = document.getElementById("price");
@@ -282,12 +284,12 @@
       function getQty() {
         const v = safeNum(qtyInput.value, 1);
         // Limit qty to available stock (if stock is 0, keep at 1 but button disabled anyway)
-        const max = inv > 0 ? inv : 1;
+        const max = available > 0 ? available : 1;
         return clamp(Math.floor(v), 1, max);
       }
 
       function setQty(n) {
-        qtyInput.value = String(getQty() === n ? n : clamp(n, 1, inv > 0 ? inv : 1));
+        qtyInput.value = String(getQty() === n ? n : clamp(n, 1, available > 0 ? available : 1));
       }
 
       qtyInput.addEventListener("input", () => setQty(getQty()));
@@ -295,7 +297,7 @@
       qtyPlus.addEventListener("click", () => setQty(getQty() + 1));
 
       // If sold out, disable qty controls completely
-      if (inv <= 0) {
+      if (available <= 0) {
         qtyInput.disabled = true;
         qtyMinus.disabled = true;
         qtyPlus.disabled = true;
@@ -365,7 +367,7 @@
 
       // ===== Add to cart (uses qty) =====
       const addBtn = document.getElementById("addBtn");
-      if (inv <= 0) {
+      if (available <= 0) {
         addBtn.disabled = true;
         addBtn.textContent = "Sold out";
         addBtn.style.background = "#ddd";

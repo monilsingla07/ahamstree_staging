@@ -31,6 +31,10 @@ function productCard(p) {
     ? `<img src="${p.image_url}" alt="${p.title ?? ""}" loading="lazy">`
     : `<div class="img-placeholder" aria-label="${p.title ?? ""}"></div>`;
 
+  const inv = Number(p.inventory_qty || 0);
+  const res = Number(p.reserved_qty || 0);
+  const available = Math.max(0, inv - res);
+
   return `
     <div class="card product-card">
       <a href="product.html?id=${encodeURIComponent(p.id)}" class="product-link">
@@ -39,7 +43,7 @@ function productCard(p) {
           <div class="product-title">${p.title ?? ""}</div>
           <div class="product-price">${moneyINR(p.price_inr)}</div>
           <div class="small" style="margin-top:6px;">
-            ${(p.inventory_qty ?? 0) > 0 ? "In stock" : "Sold out"}
+            ${available > 0 ? `In stock (${available})` : "Sold out"}
           </div>
         </div>
       </a>
@@ -72,7 +76,7 @@ async function fetchMostLoved(limit = 6) {
   const { data, error } = await supabase
     .from("products")
     .select(
-      "id,title,price_inr,inventory_qty,is_active,created_at,view_count, product_images(image_url, sort_order)"
+      "id,title,price_inr,inventory_qty,reserved_qty,is_active,created_at,view_count, product_images(image_url, sort_order)"
     )
     .eq("is_active", true)
     .order("view_count", { ascending: false })
@@ -88,7 +92,7 @@ async function fetchLatestActive(limit = 6) {
   const { data, error } = await supabase
     .from("products")
     .select(
-      "id,title,price_inr,inventory_qty,is_active,created_at, product_images(image_url, sort_order)"
+      "id,title,price_inr,inventory_qty,reserved_qty,is_active,created_at, product_images(image_url, sort_order)"
     )
     .eq("is_active", true)
     .order("created_at", { ascending: false })

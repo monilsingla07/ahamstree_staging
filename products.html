@@ -63,28 +63,8 @@
         <div id="collectionList" class="filter-list small">Loading…</div>
       </div>
 
-      <!-- NEW: Fabric Type Filter -->
-      <div class="filter-block">
-        <div class="filter-title">Fabric Type</div>
-        <div class="filter-list">
-          <label class="filter-option">
-            <input type="checkbox" name="fabric" value="silk" />
-            <span>Silk</span>
-          </label>
-          <label class="filter-option">
-            <input type="checkbox" name="fabric" value="cotton" />
-            <span>Cotton</span>
-          </label>
-          <label class="filter-option">
-            <input type="checkbox" name="fabric" value="banarasi" />
-            <span>Banarasi</span>
-          </label>
-          <label class="filter-option">
-            <input type="checkbox" name="fabric" value="kanjivaram" />
-            <span>Kanjivaram</span>
-          </label>
-        </div>
-      </div>
+      <!-- NOTE: Fabric filter removed because your current `products` table doesn't have a `fabric` column.
+           If you add it later, we can re-enable this UI and query. -->
 
       <div class="filter-block">
         <div class="filter-title">Price (₹)</div>
@@ -224,8 +204,6 @@
     const max = numOrNull(params.get("max"));
     const sort = params.get("sort") || "newest";
     
-    // NEW: Get fabric filters
-    const selectedFabrics = params.get("fabrics")?.split(',').filter(Boolean) || [];
     const inStockOnly = params.get("inStock") === "true";
 
     let productIds = null;
@@ -273,20 +251,14 @@
 
     let query = supabase
       .from("products")
-      .select("id,title,price_inr,inventory_qty,is_active,created_at,view_count,product_images(image_url, sort_order)")
+      // Include `reserved_qty` so we can show the real available stock:
+      // available = inventory_qty - reserved_qty
+      .select("id,title,price_inr,sale_price_inr,inventory_qty,reserved_qty,is_active,created_at,view_count,product_images(image_url, sort_order)")
       .eq("is_active", true);
 
     if (productIds) query = query.in("id", productIds);
     if (min !== null) query = query.gte("price_inr", min);
     if (max !== null) query = query.lte("price_inr", max);
-    
-    
-
-    // NEW: Apply fabric filter (expects products.fabric to store values like "silk", "cotton", etc.)
-    if (selectedFabrics.length) {
-      query = query.in("fabric", selectedFabrics);
-    }
-
     // NEW: Apply stock filter
     if (inStockOnly) {
       query = query.gt("inventory_qty", 0);
@@ -304,10 +276,35 @@
       return;
     }
 
-    const normalized = (data ?? []).map(p => {
+    // Normalize rows + compute available stock (inventory - reserved)
+    let normalized = (data ?? []).map(p => {
       const imgs = (p.product_images ?? []).slice().sort((a,b)=> (a.sort_order??0)-(b.sort_order??0));
-      return { ...p, image_url: imgs[0]?.image_url ?? "" };
+
+      const inv = Number(p.inventory_qty || 0);
+      const res = Number(p.reserved_qty || 0);
+      const available_qty = Math.max(0, inv - res);
+
+      const original_price = Number(p.price_inr || 0);
+      const sale_price = (p.sale_price_inr === null || p.sale_price_inr === undefined)
+        ? null
+        : Number(p.sale_price_inr);
+
+      const effective_price = (sale_price && sale_price > 0) ? sale_price : original_price;
+
+      return {
+        ...p,
+        image_url: imgs[0]?.image_url ?? "",
+        available_qty,
+        _original_price_inr: original_price,
+        sale_price_inr: sale_price,
+        _effective_price_inr: effective_price
+      };
     });
+
+    // Extra safety: if "In stock only" is ON, filter on computed availability.
+    if (inStockOnly) {
+      normalized = normalized.filter(p => Number(p.available_qty || 0) > 0);
+    }
 
     status.textContent = normalized.length ? "" : "No products found.";
 
@@ -321,9 +318,18 @@
           ${p.image_url ? `<img src="${p.image_url}" alt="${p.title}" loading="lazy">` : `<div style="height:280px;background:#fafafa;"></div>`}
           <div class="p">
             <div class="product-title">${p.title}</div>
-            <div style="margin-top:6px;opacity:.85;">${moneyINR(p.price_inr)}</div>
+            <div style="margin-top:6px;opacity:.85;">
+              ${(() => {
+                const base = Number(p.price_inr || 0);
+                const sale = p.sale_price_inr == null ? null : Number(p.sale_price_inr);
+                if (sale != null && sale > 0 && sale < base) {
+                  return `<span style="text-decoration:line-through;opacity:.6;margin-right:6px;">${moneyINR(base)}</span><span>${moneyINR(sale)}</span>`;
+                }
+                return moneyINR(base);
+              })()}
+            </div>
             <div class="small" style="margin-top:6px;">
-              ${p.inventory_qty > 0 ? `${p.inventory_qty} in stock` : "Sold out"}
+              ${Number(p.available_qty || 0) > 0 ? `${Number(p.available_qty)} in stock` : "Sold out"}
             </div>
           </div>
         </a>
@@ -335,13 +341,6 @@
   document.getElementById("minPrice").value = params.get("min") || "";
   document.getElementById("maxPrice").value = params.get("max") || "";
   document.getElementById("sortBy").value = params.get("sort") || "newest";
-  
-  // NEW: Init fabric checkboxes from URL
-  const savedFabrics = params.get("fabrics")?.split(',').filter(Boolean) || [];
-  savedFabrics.forEach(fabric => {
-    const checkbox = document.querySelector(`input[name="fabric"][value="${fabric}"]`);
-    if (checkbox) checkbox.checked = true;
-  });
   
   // NEW: Init stock checkbox from URL
   document.getElementById("inStockOnly").checked = params.get("inStock") === "true";
@@ -357,11 +356,6 @@
     setParam("min", document.getElementById("minPrice").value.trim());
     setParam("max", document.getElementById("maxPrice").value.trim());
     
-    // NEW: Save fabric selections
-    const fabricCheckboxes = document.querySelectorAll('input[name="fabric"]:checked');
-    const selectedFabrics = Array.from(fabricCheckboxes).map(cb => cb.value);
-    setParam("fabrics", selectedFabrics.join(','));
-    
     // NEW: Save stock filter
     setParam("inStock", document.getElementById("inStockOnly").checked ? "true" : "");
     
@@ -375,16 +369,12 @@
     params.delete("min"); 
     params.delete("max"); 
     params.delete("sort");
-    params.delete("fabrics");  // NEW
     params.delete("inStock");  // NEW
     history.replaceState({}, "", url.pathname);
 
     document.getElementById("minPrice").value = "";
     document.getElementById("maxPrice").value = "";
     document.getElementById("sortBy").value = "newest";
-    
-    // NEW: Clear fabric checkboxes
-    document.querySelectorAll('input[name="fabric"]').forEach(cb => cb.checked = false);
     
     // NEW: Clear stock checkbox
     document.getElementById("inStockOnly").checked = false;

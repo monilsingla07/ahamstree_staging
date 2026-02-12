@@ -42,7 +42,9 @@ export async function searchProducts(query) {
   const { data, error } = await supabase
     .from("products")
     .select(
-      "id,title,description,price_inr,sale_price_inr,inventory_qty,is_active,fabric,created_at, product_images(image_url, sort_order)"
+      // NOTE: Your current schema does NOT have a `fabric` column.
+      // If you add it later, you can include it again.
+      "id,title,description,price_inr,sale_price_inr,inventory_qty,reserved_qty,is_active,created_at, product_images(image_url, sort_order)"
     )
     .eq("is_active", true)
     .or(
@@ -100,7 +102,12 @@ export function renderSearchResults(products) {
             <div class="product-title">${p.title || ""}</div>
             <div class="product-price" style="margin-top:6px;">${priceHtml}</div>
             <div class="small" style="margin-top:6px; opacity:.75;">
-              ${(Number(p.inventory_qty || 0) > 0) ? "In stock" : "Sold out"}
+              ${(() => {
+                const inv = Number(p.inventory_qty || 0);
+                const res = Number(p.reserved_qty || 0);
+                const avail = Math.max(0, inv - res);
+                return (avail > 0) ? "In stock" : "Sold out";
+              })()}
             </div>
           </div>
         </a>
