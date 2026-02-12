@@ -135,7 +135,7 @@ export function renderHeader(active = "") {
         <div class="utils utils-desktop">
           <a class="util-link" href="search.html" title="Search">Search</a>
           <a id="accountLink" class="util-link" href="login.html" title="Account">Login / Sign up</a>
-
+<a class="util-link ${active === "wishlist" ? "active" : ""}" href="wishlist.html" title="Wishlist">Wishlist</a>
           <a class="util-link ${active === "cart" ? "active" : ""}" href="cart.html" title="Cart">Cart (${count})</a>
         </div>
       </div>
