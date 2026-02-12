@@ -385,10 +385,11 @@
       if (gstLabel) gstLabel.textContent = GST_INCLUDED_IN_PRICE ? "GST (included)" : "GST";
 
       if (couponMsg) {
-        couponMsg.textContent = code
-          ? "Coupon preview not available yet (deploy the `quote-order` Edge Function)."
-          : "";
-      }
+    const details = q?.error ? ` (${q.error})` : "";
+    couponMsg.textContent = code
+      ? `Coupon preview not available yet. Please check quote-order deployment/secrets.${details}`
+      : "";
+  }
     }
 
     // Update GST display
