@@ -201,24 +201,27 @@
     return { gst, taxable: net };
   }
 
-  async function tryServerQuote({ cart, coupon_code }) {
-    try {
-      const sbMod = await import("./assets/supabase.js");
+async function tryServerQuote({ cart, coupon_code }) {
+  try {
+    const sbMod = await import("./assets/supabase.js");
 
-      const { data, error } = await sbMod.supabase.functions.invoke("quote-order", {
-        body: { cart, coupon_code }
-      });
+    // Add Authorization header only if user is logged in
+    const { data: sess } = await sbMod.supabase.auth.getSession();
+    const token = sess?.session?.access_token;
+
+    const { data, error } = await sbMod.supabase.functions.invoke("quote-order", {
+      body: { cart, coupon_code },
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
 
     if (error) {
-  // show the actual response body if Supabase provides it
-  return { ok: false, error: error.message || "Quote error", details: error };
-}
-      if (!data) return { ok: false, error: "No quote returned" };
-      return { ok: true, data };
-    } catch (e) {
-      return { ok: false, error: String(e?.message ?? e) };
+      return { ok: false, error: error.message || "Quote error", details: error };
     }
-  }
+    if (!data) return { ok: false, error: "No quote returned" };
+    return { ok: true, data };
+  } catch (e) {
+    return { ok: fa
+::contentReference[oaicite:0]{index=0}
 
   async function renderOrderSummary({ coupon_code = "" } = {}) {
     const summaryItems = document.getElementById("summaryItems");
@@ -653,17 +656,20 @@
       const payloadCart = cart.map(i => ({ product_id: i.product_id, qty: i.qty }));
 
       // IMPORTANT: Match create-payment-link function expected fields
-      const { data, error } = await sbMod.supabase.functions.invoke("create-payment-link", {
-        body: {
-          cart: payloadCart,
-          coupon_code: (appliedCoupon || null),
-          customer_name: shipping.full_name,
-          customer_phone: shipping.phone,
-          customer_email: shipping.email || null,
-          shipping_address: shipping,
-          shipping_inr: 0
-        }
-      });
+  const { data, error } = await sbMod.supabase.functions.invoke("create-payment-link", {
+  body: {
+    cart: payloadCart,
+    coupon_code: (appliedCoupon || null),
+    customer_name: shipping.full_name,
+    customer_phone: shipping.phone,
+    customer_email: shipping.email || null,
+    shipping_address: shipping,
+    shipping_inr: 0
+  },
+  headers: {
+    Authorization: `Bearer ${session.access_token}`
+  }
+});
 
       if (error) {
         showError(error.message || "Payment setup failed. Please try again.");
