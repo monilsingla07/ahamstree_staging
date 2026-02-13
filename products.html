@@ -98,6 +98,7 @@
 <script type="module">
   import { renderHeader, renderFooter, hydrateHeaderAuth } from "./assets/ui.js";
   import { supabase } from "./assets/supabase.js";
+  import { escapeHtml, escapeAttr, safeSrc } from "./assets/safe.js";
 
   document.getElementById("header").innerHTML = renderHeader("products");
   document.getElementById("footer").innerHTML = renderFooter();
@@ -182,8 +183,8 @@
       </label>
     ` + (data ?? []).map(c => `
       <label class="filter-option">
-        <input type="radio" name="col" value="${c.slug}" ${c.slug === selected ? "checked" : ""} />
-        <span>${c.name}</span>
+        <input type="radio" name="col" value="${escapeAttr(c.slug)}" ${c.slug === selected ? "checked" : ""} />
+        <span>${escapeHtml(c.name)}</span>
       </label>
     `).join("");
 
@@ -315,9 +316,9 @@
     grid.innerHTML = normalized.map(p => `
       <div class="card product-card">
         <a class="product-link" href="product.html?id=${encodeURIComponent(p.id)}">
-          ${p.image_url ? `<img src="${p.image_url}" alt="${p.title}" loading="lazy">` : `<div style="height:280px;background:#fafafa;"></div>`}
+          ${p.image_url ? `<img src="${safeSrc(p.image_url)}" alt="${escapeAttr(p.title)}" loading="lazy">` : `<div style="height:280px;background:#fafafa;"></div>`}
           <div class="p">
-            <div class="product-title">${p.title}</div>
+            <div class="product-title">${escapeHtml(p.title)}</div>
             <div style="margin-top:6px;opacity:.85;">
               ${(() => {
                 const base = Number(p.price_inr || 0);

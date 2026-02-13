@@ -17,7 +17,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/styles.css" />
-  <link rel="stylesheet" href="assets/styles.css" />
 </head>
 
 <body>
@@ -46,6 +45,7 @@
   <script type="module">
     import { renderHeader, renderFooter, hydrateHeaderAuth } from "./assets/ui.js";
     import { supabase } from "./assets/supabase.js";
+    import { escapeHtml, safeHref } from "./assets/safe.js";
 
     document.getElementById("header").innerHTML = renderHeader("account");
     document.getElementById("footer").innerHTML = renderFooter();
@@ -74,26 +74,27 @@
 
     function renderOrder(o) {
       const items = (o.order_items || [])
-        .map(it => `<div class="small">${it.qty} × ${it.title} — ${money(it.price_inr)}</div>`)
+        .map(it => `<div class="small">${Number(it.qty || 0)} × ${escapeHtml(it.title)} — ${money(it.price_inr)}</div>`)
         .join("");
 
       const payLink = o.razorpay_payment_link_url;
-      const canPay = (o.status === "payment_link_created" || o.status === "payment_failed" || o.status === "expired") && payLink;
+      const safePayHref = safeHref(payLink);
+      const canPay = (o.status === "payment_link_created" || o.status === "payment_failed" || o.status === "expired") && !!safePayHref;
 
       return `
         <div class="card">
           <div class="p" style="padding:16px;">
             <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start;">
               <div>
-                <div style="font-weight:900;">Order ${o.id}</div>
+                <div style="font-weight:900;">Order ${escapeHtml(o.id)}</div>
                 <div class="small" style="margin-top:6px;">
-                  Status: <b>${badge(o.status)}</b> • Total: <b>${money(o.total_inr)}</b>
+                  Status: <b>${escapeHtml(badge(o.status))}</b> • Total: <b>${money(o.total_inr)}</b>
                 </div>
                 <div class="small">Placed: ${o.created_at ? new Date(o.created_at).toLocaleString("en-IN") : "-"}</div>
               </div>
 
               <div style="display:flex;gap:10px;flex-wrap:wrap;">
-                ${canPay ? `<a class="btn" href="${payLink}" target="_blank" rel="noopener">Pay now</a>` : ``}
+                ${canPay ? `<a class="btn" href="${safePayHref}" target="_blank" rel="noopener noreferrer">Pay now</a>` : ``}
               </div>
             </div>
             <hr />

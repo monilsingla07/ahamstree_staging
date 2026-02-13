@@ -17,7 +17,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/styles.css" />
-  <link rel="stylesheet" href="assets/styles.css" />
 </head>
 <body>
   <div id="header"></div>
@@ -55,6 +54,7 @@
   import { renderHeader, renderFooter, hydrateHeaderAuth } from "./assets/ui.js";
   import { supabase } from "./assets/supabase.js";
   import { getCart, updateQty, removeFromCart, clearCart } from "./assets/cart.js";
+	  import { escapeHtml, escapeAttr, safeSrc } from "./assets/safe.js";
 
   function money(n) {
     const num = Number(n || 0);
@@ -161,27 +161,30 @@
       const lineTotal = unitPrice * qty;
       subtotal += lineTotal;
 
-      html +=
-        '<div class="card" style="padding:12px;border-radius:14px;display:flex;gap:12px;margin-bottom:12px;">' +
-          '<div style="width:72px;height:90px;border-radius:12px;overflow:hidden;background:#fafafa;">' +
-            (imgUrl
-              ? '<img src="' + imgUrl + '" alt="' + title + '" style="width:100%;height:100%;object-fit:cover;">'
-              : ''
-            ) +
-          '</div>' +
-          '<div style="flex:1;min-width:0;">' +
-            '<div style="font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + title + '</div>' +
-            '<div style="margin-top:6px;opacity:.85;">' + money(unitPrice) + '</div>' +
-            (soldOut ? '<div class="small" style="margin-top:6px;color:crimson;">Sold out</div>' : '') +
-            (!soldOut && max > 0 ? '<div class="small" style="margin-top:6px;opacity:.75;">Available: ' + max + '</div>' : '') +
-            '<div class="row" style="margin-top:10px;">' +
-              '<span class="small">Qty</span>' +
-              '<input class="qty input" data-max="' + max + '" data-id="' + i.product_id + '" style="width:90px;" type="number" min="1" max="' + (max || 1) + '" value="' + qty + '" ' + (soldOut ? "disabled" : "") + '>' +
-              '<button class="remove btn secondary" data-id="' + i.product_id + '" type="button">Remove</button>' +
-            '</div>' +
-          '</div>' +
-          '<div style="font-weight:900;flex:0 0 auto;">' + money(lineTotal) + '</div>' +
-        '</div>';
+	      const safeTitleText = escapeHtml(title);
+	      const safeAlt = escapeAttr(title);
+	      const safeImg = safeSrc(imgUrl);
+	      const safePid = escapeAttr(i.product_id);
+
+	      html += `
+	        <div class="card" style="padding:12px;border-radius:14px;display:flex;gap:12px;margin-bottom:12px;">
+	          <div style="width:72px;height:90px;border-radius:12px;overflow:hidden;background:#fafafa;">
+	            ${safeImg ? `<img src="${safeImg}" alt="${safeAlt}" style="width:100%;height:100%;object-fit:cover;">` : ``}
+	          </div>
+	          <div style="flex:1;min-width:0;">
+	            <div style="font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${safeTitleText}</div>
+	            <div style="margin-top:6px;opacity:.85;">${money(unitPrice)}</div>
+	            ${soldOut ? `<div class="small" style="margin-top:6px;color:crimson;">Sold out</div>` : ``}
+	            ${(!soldOut && max > 0) ? `<div class="small" style="margin-top:6px;opacity:.75;">Available: ${max}</div>` : ``}
+	            <div class="row" style="margin-top:10px;">
+	              <span class="small">Qty</span>
+	              <input class="qty input" data-max="${max}" data-id="${safePid}" style="width:90px;" type="number" min="1" max="${max || 1}" value="${qty}" ${soldOut ? "disabled" : ""}>
+	              <button class="remove btn secondary" data-id="${safePid}" type="button">Remove</button>
+	            </div>
+	          </div>
+	          <div style="font-weight:900;flex:0 0 auto;">${money(lineTotal)}</div>
+	        </div>
+	      `;
     }
 
     list.innerHTML = html;

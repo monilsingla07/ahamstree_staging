@@ -17,7 +17,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/styles.css" />
-  <link rel="stylesheet" href="assets/styles.css" />
 </head>
 <body>
   <div id="header"></div>
@@ -34,7 +33,8 @@
 
   <script type="module">
     import { renderHeader, renderFooter, hydrateHeaderAuth } from "./assets/ui.js";
-import { supabase } from "./assets/supabase.js";
+    import { supabase } from "./assets/supabase.js";
+    import { escapeHtml } from "./assets/safe.js";
 
 
     document.getElementById("header").innerHTML = renderHeader("login");
@@ -54,11 +54,23 @@ document.getElementById("footer").innerHTML = renderFooter();
       if (!__nextRaw) return null;
       let decoded = "";
       try { decoded = decodeURIComponent(__nextRaw); } catch { decoded = __nextRaw; }
+      decoded = String(decoded || "").trim();
 
-      // Allow only same-site relative paths to avoid open redirects
-      if (decoded.startsWith("/")) return decoded;
-      if (decoded.endsWith(".html") || decoded.includes(".html?")) return "/" + decoded.replace(/^\/+/, "");
-      return null;
+      // SECURITY: prevent open redirects.
+      // - Block absolute URLs like https://evil.com
+      // - Block protocol-relative URLs like //evil.com
+      if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(decoded)) return null;
+      if (decoded.startsWith("//")) return null;
+      if (decoded.includes("\n") || decoded.includes("\r")) return null;
+
+      // Normalize to a single-leading-slash path
+      decoded = "/" + decoded.replace(/^\/+/, "");
+
+      // Allow home or any *.html (+ optional query/hash)
+      if (decoded === "/") return decoded;
+      const pathOnly = decoded.split(/[?#]/)[0];
+      if (!pathOnly.endsWith(".html")) return null;
+      return decoded;
     }
 
     const NEXT_URL = getNextUrl();
@@ -258,7 +270,7 @@ function renderLoggedIn(email) {
 
   app.innerHTML = `
     <div style="font-weight:900;">My Account</div>
-    <div class="small" style="margin-top:6px;">Signed in as ${email}</div>
+    <div class="small" style="margin-top:6px;">Signed in as ${escapeHtml(email)}</div>
 
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">
       <a class="btn secondary" href="orders.html">Orders</a>

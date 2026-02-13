@@ -17,7 +17,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/styles.css" />
-  <link rel="stylesheet" href="assets/styles.css" />
 </head>
 <body>
   <div id="header"></div>
@@ -35,6 +34,7 @@
   <script type="module">
     import { renderHeader, renderFooter, hydrateHeaderAuth } from "./assets/ui.js";
     import { supabase } from "./assets/supabase.js";
+    import { escapeHtml, escapeAttr, safeSrc } from "./assets/safe.js";
 
     document.getElementById("header").innerHTML = renderHeader("");
     document.getElementById("footer").innerHTML = renderFooter();
@@ -56,10 +56,10 @@
       grid.innerHTML = (data ?? []).map(c => `
         <div class="card">
           <a href="collection.html?slug=${encodeURIComponent(c.slug)}" style="text-decoration:none;color:inherit;">
-            ${c.cover_image_url ? `<img src="${c.cover_image_url}" alt="${c.name}" loading="lazy">` : `<div style="height:220px;background:#fafafa;"></div>`}
+            ${c.cover_image_url ? `<img src="${safeSrc(c.cover_image_url)}" alt="${escapeAttr(c.name)}" loading="lazy">` : `<div style="height:220px;background:#fafafa;"></div>`}
             <div class="p">
-              <div style="font-weight:900;">${c.name}</div>
-              <div class="small" style="margin-top:6px;opacity:.85;">${c.description ?? ""}</div>
+              <div style="font-weight:900;">${escapeHtml(c.name)}</div>
+              <div class="small" style="margin-top:6px;opacity:.85;">${escapeHtml(c.description ?? "")}</div>
             </div>
           </a>
         </div>

@@ -1,5 +1,6 @@
 // assets/home.js
 import { supabase } from "./supabase.js";
+import { escapeHtml, escapeAttr, safeSrc, safeCssUrl } from "./safe.js";
 
 /**
  * Home page helpers:
@@ -28,8 +29,8 @@ function normalizeProducts(rows = []) {
 
 function productCard(p) {
   const img = p.image_url
-    ? `<img src="${p.image_url}" alt="${p.title ?? ""}" loading="lazy">`
-    : `<div class="img-placeholder" aria-label="${p.title ?? ""}"></div>`;
+    ? `<img src="${safeSrc(p.image_url)}" alt="${escapeAttr(p.title ?? "")}" loading="lazy">`
+    : `<div class="img-placeholder" aria-label="${escapeAttr(p.title ?? "")}"></div>`;
 
   const inv = Number(p.inventory_qty || 0);
   const res = Number(p.reserved_qty || 0);
@@ -40,7 +41,7 @@ function productCard(p) {
       <a href="product.html?id=${encodeURIComponent(p.id)}" class="product-link">
         ${img}
         <div class="p">
-          <div class="product-title">${p.title ?? ""}</div>
+          <div class="product-title">${escapeHtml(p.title ?? "")}</div>
           <div class="product-price">${moneyINR(p.price_inr)}</div>
           <div class="small" style="margin-top:6px;">
             ${available > 0 ? `In stock (${available})` : "Sold out"}
@@ -66,7 +67,7 @@ function pickHeroBackground(products) {
   const hero = document.querySelector(".hero-slide[data-slide='1']");
   if (!hero) return;
   const img = (products ?? []).find(p => p.image_url)?.image_url;
-  if (img) hero.style.setProperty("--hero-bg", `url('${img}')`);
+  if (img) hero.style.setProperty("--hero-bg", `url("${safeCssUrl(img)}")`);
 }
 
 /* ------------------ DATA FETCHERS ------------------ */

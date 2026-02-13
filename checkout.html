@@ -54,45 +54,45 @@
         <div class="small" style="opacity:.8; margin-bottom:12px;">Used for delivery updates and invoice.</div>
 
         <label class="small">Full name</label>
-        <input class="input" name="full_name" required placeholder="e.g., Monil Gupta" />
+        <input class="input" name="full_name" required placeholder="e.g., Monil Gupta" autocomplete="name" autocapitalize="words" />
 
         <div style="height:10px;"></div>
 
         <label class="small">Phone</label>
-        <input class="input" name="phone" required maxlength="10" placeholder="10-digit mobile" inputmode="numeric" />
+        <input class="input" type="tel" name="phone" required maxlength="10" placeholder="10-digit mobile" inputmode="numeric" autocomplete="tel" />
 
         <div style="height:10px;"></div>
 
         <label class="small">Email (optional)</label>
-        <input class="input" name="email" placeholder="name@email.com" inputmode="email" />
+        <input class="input" type="email" name="email" placeholder="name@email.com" inputmode="email" autocomplete="email" />
 
         <div style="height:10px;"></div>
 
         <label class="small">Address line 1</label>
-        <input class="input" name="address_line1" required placeholder="House / street" />
+        <input class="input" name="address_line1" required placeholder="House / street" autocomplete="shipping address-line1" autocapitalize="words" />
 
         <div style="height:10px;"></div>
 
         <label class="small">Address line 2 (optional)</label>
-        <input class="input" name="address_line2" placeholder="Landmark" />
+        <input class="input" name="address_line2" placeholder="Landmark" autocomplete="shipping address-line2" autocapitalize="words" />
 
         <div style="height:10px;"></div>
 
         <div class="row">
           <div style="flex:1;">
             <label class="small">City</label>
-            <input class="input" name="city" required />
+            <input class="input" name="city" required autocomplete="shipping address-level2" autocapitalize="words" />
           </div>
           <div style="flex:1;">
             <label class="small">State</label>
-            <input class="input" name="state" required />
+            <input class="input" name="state" required autocomplete="shipping address-level1" autocapitalize="words" />
           </div>
         </div>
 
         <div style="height:10px;"></div>
 
         <label class="small">Pincode</label>
-        <input class="input" name="pincode" required maxlength="6" placeholder="e.g., 560001" inputmode="numeric" />
+        <input class="input" name="pincode" required maxlength="6" placeholder="e.g., 560001" inputmode="numeric" autocomplete="shipping postal-code" />
 
         <div style="height:14px;"></div>
 
@@ -157,6 +157,8 @@
   <div id="footer"></div>
 
   <script type="module">
+    import { escapeHtml, escapeAttr, safeSrc } from "./assets/safe.js";
+
     const statusEl = document.getElementById("status");
     const warnBox = document.getElementById("warn");
     const warnText = document.getElementById("warnText");
@@ -320,15 +322,19 @@
         else if (!active || available <= 0) stockText = "Sold out";
         else if (qty > available) stockText = `Only ${available} left`;
 
+        const safeImg = safeSrc(imgUrl);
+        const safeAlt = escapeAttr(title);
+        const safeTitle = escapeHtml(title);
+
         return `
           <div style="display:flex; gap:10px; align-items:center;">
             <div style="width:54px;height:64px;border-radius:12px;overflow:hidden;background:#fafafa;flex:0 0 auto;">
-              ${imgUrl ? `<img src="${imgUrl}" alt="${title}" style="width:100%;height:100%;object-fit:cover;">` : ""}
+              ${safeImg ? `<img src="${safeImg}" alt="${safeAlt}" style="width:100%;height:100%;object-fit:cover;">` : ""}
             </div>
 
             <div style="flex:1; min-width:0;">
               <div style="font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                ${title}
+                ${safeTitle}
               </div>
               <div class="small" style="opacity:.75;">${money(unitPrice)} × ${qty}</div>
               ${stockText ? `<div class="small" style="color:crimson; margin-top:2px;">${stockText}</div>` : ""}

@@ -17,7 +17,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/styles.css" />
-  <link rel="stylesheet" href="assets/styles.css" />
 
   <!-- Page-only styles (keeps global CSS untouched) -->
   <style>
@@ -67,6 +66,7 @@
   <script type="module">
     import { renderHeader, renderFooter, hydrateHeaderAuth } from "./assets/ui.js";
     import { supabase } from "./assets/supabase.js";
+    import { escapeHtml } from "./assets/safe.js";
 
     document.getElementById("header").innerHTML = renderHeader("account");
     document.getElementById("footer").innerHTML = renderFooter();
@@ -94,7 +94,9 @@
     }
 
     function safeText(v) {
-      return (v === null || v === undefined || String(v).trim() === "") ? "—" : String(v);
+      const s = (v === null || v === undefined) ? "" : String(v);
+      const t = s.trim();
+      return t ? escapeHtml(t) : "—";
     }
 
     async function loadProfile(userId) {
@@ -114,7 +116,7 @@
           <aside class="card acct-nav">
             <div class="nav-title">Account</div>
             <div class="small nav-muted">Signed in as</div>
-            <div style="margin-top:4px;font-weight:900;word-break:break-word;">${email}</div>
+            <div style="margin-top:4px;font-weight:900;word-break:break-word;">${escapeHtml(email)}</div>
 
             <div style="margin-top:12px;">
               ${navButton("profile", "Profile")}
@@ -149,7 +151,7 @@
 
       const { error, profile } = await loadProfile(user.id);
       if (error) {
-        body.innerHTML = `<div class="small">Could not load profile: ${error.message}</div>`;
+        body.innerHTML = `<div class="small">Could not load profile: ${escapeHtml(error.message)}</div>`;
         return;
       }
 
@@ -191,7 +193,7 @@
 
       const { error, profile } = await loadProfile(user.id);
       if (error) {
-        body.innerHTML = `<div class="small">Could not load address: ${error.message}</div>`;
+        body.innerHTML = `<div class="small">Could not load address: ${escapeHtml(error.message)}</div>`;
         return;
       }
 

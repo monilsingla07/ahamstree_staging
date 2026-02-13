@@ -192,24 +192,24 @@ export function renderFooter() {
 
       <div class="container footer-bottom">
         <div class="social-links">
-  <a href="https://www.instagram.com/ahamstree/" target="_blank" rel="noopener"
+	  <a href="https://www.instagram.com/ahamstree/" target="_blank" rel="noopener noreferrer"
      class="instagram" aria-label="Instagram">
     <img src="assets/images/icons/instagram.png" alt="Instagram">
   </a>
 
-  <a href="https://www.facebook.com/" target="_blank" rel="noopener" class="facebook" aria-label="Facebook">
+	  <a href="https://www.facebook.com/" target="_blank" rel="noopener noreferrer" class="facebook" aria-label="Facebook">
     <img src="assets/images/icons/facebook.png" alt="Facebook">
   </a>
 
-  <a href="https://www.pinterest.com/" target="_blank" rel="noopener" class="pinterest" aria-label="Pinterest">
+	  <a href="https://www.pinterest.com/" target="_blank" rel="noopener noreferrer" class="pinterest" aria-label="Pinterest">
     <img src="assets/images/icons/pinterest.png" alt="Pinterest">
   </a>
 
-  <a href="https://www.youtube.com/" target="_blank" rel="noopener" class="youtube" aria-label="YouTube">
+	  <a href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer" class="youtube" aria-label="YouTube">
     <img src="assets/images/icons/youtube.png" alt="YouTube">
   </a>
 
-  <a href="https://wa.me/919582297550" target="_blank"
+	  <a href="https://wa.me/919582297550" target="_blank" rel="noopener noreferrer"
      class="whatsapp" aria-label="WhatsApp">
     <img src="assets/images/icons/whatsapp.png" alt="WhatsApp">
   </a>

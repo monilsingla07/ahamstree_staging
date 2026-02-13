@@ -17,7 +17,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/styles.css" />
-  <link rel="stylesheet" href="assets/styles.css" />
 </head>
 <body>
   <div id="header"></div>
@@ -35,6 +34,7 @@
   <script type="module">
     import { renderHeader, renderFooter, hydrateHeaderAuth } from "./assets/ui.js";
     import { supabase } from "./assets/supabase.js";
+    import { escapeHtml, escapeAttr, safeSrc } from "./assets/safe.js";
 
     document.getElementById("header").innerHTML = renderHeader("");
     document.getElementById("footer").innerHTML = renderFooter();
@@ -74,10 +74,10 @@
         return `
           <div class="card">
             <a href="product.html?id=${encodeURIComponent(p.id)}" style="text-decoration:none;color:inherit;">
-              ${p.image_url ? `<img src="${p.image_url}" alt="${p.title}" loading="lazy">` : `<div style="height:280px;background:#fafafa;"></div>`}
+              ${p.image_url ? `<img src="${safeSrc(p.image_url)}" alt="${escapeAttr(p.title)}" loading="lazy">` : `<div style="height:280px;background:#fafafa;"></div>`}
               <div class="p">
                 <div style="font-weight:900;display:flex;justify-content:space-between;gap:10px;">
-                  <span>${p.title}</span>
+                  <span>${escapeHtml(p.title)}</span>
                   ${badge ? `<span class="small" style="font-weight:800;">${badge}</span>` : ``}
                 </div>
                 <div style="margin-top:6px;opacity:.9;">

@@ -28,6 +28,7 @@
   <script type="module">
     import { renderHeader, renderFooter, hydrateHeaderAuth } from "./assets/ui.js";
     import { getWishlist, removeFromWishlist } from "./assets/wishlist.js";
+    import { escapeHtml, escapeAttr, safeSrc } from "./assets/safe.js";
 
     document.getElementById("header").innerHTML = renderHeader("wishlist");
     hydrateHeaderAuth();
@@ -81,7 +82,7 @@
           : `<span style="font-weight:900;">${moneyINR(price)}</span>`;
 
         const imgHtml = product.image_url
-          ? `<img src="${product.image_url}" alt="${product.title || 'Product'}" loading="lazy">`
+          ? `<img src="${safeSrc(product.image_url)}" alt="${escapeAttr(product.title || 'Product')}" loading="lazy">`
           : `<div style="height:260px;background:#fafafa;border-radius:12px;"></div>`;
 
         return `
@@ -91,13 +92,13 @@
             </a>
             <div class="p">
               <a href="product.html?id=${encodeURIComponent(product.id)}" style="text-decoration: none; color: inherit;">
-                <div class="product-title">${product.title || ''}</div>
+                <div class="product-title">${escapeHtml(product.title || '')}</div>
                 <div class="product-price" style="margin-top:6px;">${priceHtml}</div>
               </a>
               <button
                 class="btn secondary js-remove"
                 style="width: 100%; margin-top: 12px;"
-                data-id="${product.id}">
+                data-id="${escapeAttr(product.id)}">
                 Remove
               </button>
             </div>
