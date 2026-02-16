@@ -66,7 +66,7 @@ export function renderHeader(active = "") {
           </div>
 
           <a href="index.html" class="mobile-logo" aria-label="Ahamstree home">
-            <img src="assets/images/ahamstree-logo.png" alt="Ahamstree">
+            <img src="assets/images/ahamstree-logo.png" alt="Ahamstree" decoding="async">
           </a>
 
           <div class="header-mobile-right">
@@ -93,7 +93,8 @@ export function renderHeader(active = "") {
               </div>
 
               <nav class="mobile-drawer-links">
-                <a href="products.html">Handloom Sarees</a>
+                <a href="products.html?type=saree">Handloom Sarees</a>
+                <a href="products.html?type=suit">Handloom Suits</a>
                 <a href="new-arrivals.html">New Arrivals</a>
                 <a href="collections.html">Collections</a>
                 <a href="sale.html">Sale</a>
@@ -114,10 +115,11 @@ export function renderHeader(active = "") {
         <!-- Left: Navigation -->
         <nav class="nav nav-desktop">
           <a href="index.html" class="site-logo" aria-label="Ahamstree home">
-            <img src="assets/images/ahamstree-logo.png" alt="Ahamstree">
+            <img src="assets/images/ahamstree-logo.png" alt="Ahamstree" decoding="async">
           </a>
 
-          <a href="products.html" class="${active === "products" ? "active" : ""}">Handloom Sarees</a>
+          <a href="products.html?type=saree" class="${(active === "products" || active === "sarees") ? "active" : ""}">Handloom Sarees</a>
+          <a href="products.html?type=suit" class="${active === "suits" ? "active" : ""}">Handloom Suits</a>
           <a href="new-arrivals.html" class="">New Arrivals</a>
           <a href="collections.html" class="">Collections</a>
           <a href="sale.html" class="">Sale</a>

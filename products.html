@@ -22,7 +22,7 @@
   <div id="header"></div>
 
   <div class="container">
-    <h2 id="pageTitle" style="margin-top:0;">Sarees</h2>
+    <h2 id="pageTitle" style="margin-top:0;">Handloom Sarees</h2>
     <div class="small">Click a product to view details</div>
 
     <!-- Nalli-like toolbar row -->
@@ -46,6 +46,10 @@
 
     <div id="status" class="small">Loading…</div>
     <div id="grid" class="grid" style="margin-top:12px;"></div>
+    <div id="loadMoreRow" class="load-more-row" style="margin:20px 0; display:none;">
+      <button id="loadMore" class="btn secondary" type="button" style="width:100%;">Load more</button>
+    </div>
+    <div id="scrollSentinel" style="height:1px;"></div>
   </div>
 
   <!-- Filter drawer (Nalli-like) -->
@@ -63,8 +67,10 @@
         <div id="collectionList" class="filter-list small">Loading…</div>
       </div>
 
-      <!-- NOTE: Fabric filter removed because your current `products` table doesn't have a `fabric` column.
-           If you add it later, we can re-enable this UI and query. -->
+      <div class="filter-block" id="fabricBlock">
+        <div class="filter-title">Category</div>
+        <div id="fabricList" class="filter-list small">Loading…</div>
+      </div>
 
       <div class="filter-block">
         <div class="filter-title">Price (₹)</div>
@@ -100,7 +106,8 @@
   import { supabase } from "./assets/supabase.js";
   import { escapeHtml, escapeAttr, safeSrc } from "./assets/safe.js";
 
-  document.getElementById("header").innerHTML = renderHeader("products");
+  const _typeForHeader = (new URL(location.href)).searchParams.get("type");
+  document.getElementById("header").innerHTML = renderHeader((_typeForHeader && _typeForHeader.toLowerCase()==="suit") ? "suits" : "products");
   document.getElementById("footer").innerHTML = renderFooter();
   hydrateHeaderAuth();
 
@@ -196,89 +203,140 @@
     });
   }
 
-  async function loadProducts(){
-    status.textContent = "Loading…";
-    grid.innerHTML = "";
+  async function loadFabrics(){
+    const box = document.getElementById("fabricList");
+    const selected = params.get("fabric") || "";
 
-    const selectedSlug = params.get("collection") || "";
-    const min = numOrNull(params.get("min"));
-    const max = numOrNull(params.get("max"));
-    const sort = params.get("sort") || "newest";
-    
-    const inStockOnly = params.get("inStock") === "true";
+    // If table doesn't exist yet, hide the block gracefully
+    try{
+      const { data, error } = await supabase
+        .from("fabrics")
+        .select("id,name,slug,description,sort_order,is_active")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true })
+        .order("name", { ascending: true });
 
-    let productIds = null;
+      if (error) throw error;
 
-    if (selectedSlug){
-      const { data: col, error: colErr } = await supabase
-        .from("collections")
+      const rows = data ?? [];
+      if (rows.length === 0){
+        document.getElementById("fabricBlock")?.classList.add("hidden");
+        return;
+      }
+
+      box.innerHTML = `
+        <label class="filter-option">
+          <input type="radio" name="fab" value="" ${selected === "" ? "checked" : ""} />
+          <span>All</span>
+        </label>
+        ${rows.map(f => `
+          <label class="filter-option">
+            <input type="radio" name="fab" value="${escapeAttr(f.slug)}" ${selected === f.slug ? "checked" : ""} />
+            <span>${escapeHtml(f.name)}</span>
+          </label>
+        `).join("")}
+      `;
+
+      Array.from(box.querySelectorAll("input[name='fab']")).forEach(r => {
+        r.addEventListener("change", () => setParam("fabric", r.value));
+      });
+    } catch(e){
+      document.getElementById("fabricBlock")?.classList.add("hidden");
+    }
+  }
+
+  // ===== Paginated loading (lazy loading) =====
+  const PAGE_SIZE = 24;
+  let offset = 0;
+  let hasMore = true;
+  let isLoading = false;
+
+  const loadMoreRow = document.getElementById("loadMoreRow");
+  const loadMoreBtn = document.getElementById("loadMore");
+  const sentinel = document.getElementById("scrollSentinel");
+
+  const cache = {
+    collectionSlug: null,
+    collectionId: null,
+    collectionName: null,
+    productIds: null,
+    fabricSlug: null,
+    fabricId: null,
+    fabricName: null
+  };
+
+  async function resolveCollection(slug){
+    if (!slug) {
+      cache.collectionSlug = null;
+      cache.collectionId = null;
+      cache.collectionName = null;
+      cache.productIds = null;
+      return null;
+    }
+    if (cache.collectionSlug === slug && cache.collectionId) return cache;
+
+    const { data: col, error: colErr } = await supabase
+      .from("collections")
+      .select("id,name")
+      .eq("slug", slug)
+      .maybeSingle();
+
+    if (colErr || !col) return null;
+
+    const { data: links, error: linkErr } = await supabase
+      .from("collection_products")
+      .select("product_id")
+      .eq("collection_id", col.id);
+
+    if (linkErr) return null;
+
+    cache.collectionSlug = slug;
+    cache.collectionId = col.id;
+    cache.collectionName = col.name;
+    cache.productIds = (links ?? []).map(x => x.product_id);
+    return cache;
+  }
+
+  async function resolveFabric(slug){
+    if (!slug) {
+      cache.fabricSlug = null;
+      cache.fabricId = null;
+      cache.fabricName = null;
+      return null;
+    }
+    if (cache.fabricSlug === slug && cache.fabricId) return cache;
+
+    try{
+      const { data: fab, error: fabErr } = await supabase
+        .from("fabrics")
         .select("id,name")
-        .eq("slug", selectedSlug)
+        .eq("slug", slug)
         .maybeSingle();
 
-      if (colErr || !col){
-        status.textContent = "Collection not found.";
-        return;
-      }
+      if (fabErr || !fab) return null;
 
-      document.getElementById("pageTitle").textContent = col.name;
-
-      const { data: links, error: linkErr } = await supabase
-        .from("collection_products")
-        .select("product_id")
-        .eq("collection_id", col.id);
-
-      if (linkErr){
-        status.textContent = "Could not load collection products.";
-        return;
-      }
-
-      productIds = (links ?? []).map(x => x.product_id);
-
-      if (productIds.length === 0){
-        status.textContent = "No products in this collection yet.";
-        itemsCount.textContent = "0 items";
-        applyFiltersBtn.textContent = "See items";
-        return;
-      }
-    } else {
-      document.getElementById("pageTitle").textContent = "Sarees";
+      cache.fabricSlug = slug;
+      cache.fabricId = fab.id;
+      cache.fabricName = fab.name;
+      return cache;
+    } catch(e){
+      return null;
     }
+  }
 
-    if (min !== null && max !== null && min > max) {
-      status.textContent = "Min price cannot be greater than Max price.";
+  function setPageTitle(){
+    const type = (params.get("type") || "saree").toLowerCase();
+    const collection = params.get("collection") || "";
+    if (collection && cache.collectionName){
+      document.getElementById("pageTitle").textContent = cache.collectionName;
       return;
     }
+    if (type === "suit") document.getElementById("pageTitle").textContent = "Handloom Suits";
+    else document.getElementById("pageTitle").textContent = "Handloom Sarees";
+  }
 
-    let query = supabase
-      .from("products")
-      // Include `reserved_qty` so we can show the real available stock:
-      // available = inventory_qty - reserved_qty
-      .select("id,title,price_inr,sale_price_inr,inventory_qty,reserved_qty,is_active,created_at,view_count,product_images(image_url, sort_order)")
-      .eq("is_active", true);
-
-    if (productIds) query = query.in("id", productIds);
-    if (min !== null) query = query.gte("price_inr", min);
-    if (max !== null) query = query.lte("price_inr", max);
-    // NEW: Apply stock filter
-    if (inStockOnly) {
-      query = query.gt("inventory_qty", 0);
-    }
-
-    if (sort === "mostLoved") query = query.order("view_count", { ascending: false }).order("created_at", { ascending: false });
-    else if (sort === "priceLow") query = query.order("price_inr", { ascending: true });
-    else if (sort === "priceHigh") query = query.order("price_inr", { ascending: false });
-    else query = query.order("created_at", { ascending: false });
-
-    const { data, error } = await query;
-
-    if (error){
-      status.textContent = "Error: " + error.message;
-      return;
-    }
-
-    // Normalize rows + compute available stock (inventory - reserved)
-    let normalized = (data ?? []).map(p => {
+  function normalize(rows = []){
+    return (rows ?? []).map(p => {
       const imgs = (p.product_images ?? []).slice().sort((a,b)=> (a.sort_order??0)-(b.sort_order??0));
 
       const inv = Number(p.inventory_qty || 0);
@@ -286,10 +344,7 @@
       const available_qty = Math.max(0, inv - res);
 
       const original_price = Number(p.price_inr || 0);
-      const sale_price = (p.sale_price_inr === null || p.sale_price_inr === undefined)
-        ? null
-        : Number(p.sale_price_inr);
-
+      const sale_price = (p.sale_price_inr === null || p.sale_price_inr === undefined) ? null : Number(p.sale_price_inr);
       const effective_price = (sale_price && sale_price > 0) ? sale_price : original_price;
 
       return {
@@ -297,26 +352,16 @@
         image_url: imgs[0]?.image_url ?? "",
         available_qty,
         _original_price_inr: original_price,
-        sale_price_inr: sale_price,
         _effective_price_inr: effective_price
       };
     });
+  }
 
-    // Extra safety: if "In stock only" is ON, filter on computed availability.
-    if (inStockOnly) {
-      normalized = normalized.filter(p => Number(p.available_qty || 0) > 0);
-    }
-
-    status.textContent = normalized.length ? "" : "No products found.";
-
-    // Update Nalli-like counts / CTA
-    itemsCount.textContent = `${normalized.length} items`;
-    applyFiltersBtn.textContent = normalized.length ? `See ${normalized.length} items` : "See items";
-
-    grid.innerHTML = normalized.map(p => `
+  function productCard(p){
+    return `
       <div class="card product-card">
         <a class="product-link" href="product.html?id=${encodeURIComponent(p.id)}">
-          ${p.image_url ? `<img src="${safeSrc(p.image_url)}" alt="${escapeAttr(p.title)}" loading="lazy">` : `<div style="height:280px;background:#fafafa;"></div>`}
+          ${p.image_url ? `<img src="${safeSrc(p.image_url)}" alt="${escapeAttr(p.title)}" loading="lazy" decoding="async">` : `<div style="height:280px;background:#fafafa;"></div>`}
           <div class="p">
             <div class="product-title">${escapeHtml(p.title)}</div>
             <div style="margin-top:6px;opacity:.85;">
@@ -335,10 +380,158 @@
           </div>
         </a>
       </div>
-    `).join("");
+    `;
   }
 
-  // Init control values from URL
+  function updateLoadMoreUI(){
+    if (hasMore) {
+      loadMoreRow.style.display = "block";
+      loadMoreBtn.disabled = false;
+      loadMoreBtn.textContent = "Load more";
+    } else {
+      loadMoreRow.style.display = "none";
+    }
+  }
+
+  async function loadNextPage(isFirst = false){
+    if (isLoading || !hasMore) return;
+    isLoading = true;
+
+    if (isFirst){
+      status.textContent = "Loading…";
+      grid.innerHTML = "";
+      offset = 0;
+      hasMore = true;
+    } else {
+      loadMoreBtn.textContent = "Loading…";
+      loadMoreBtn.disabled = true;
+    }
+
+    const selectedSlug = params.get("collection") || "";
+    const selectedFabricSlug = params.get("fabric") || "";
+    const min = numOrNull(params.get("min"));
+    const max = numOrNull(params.get("max"));
+    const sort = params.get("sort") || "newest";
+    const inStockOnly = params.get("inStock") === "true";
+    const type = (params.get("type") || "saree").toLowerCase();
+
+    // Resolve collection + fabric
+    const col = await resolveCollection(selectedSlug);
+    const fab = await resolveFabric(selectedFabricSlug);
+
+    setPageTitle();
+
+    if (selectedSlug){
+      if (!col){
+        status.textContent = "Collection not found.";
+        itemsCount.textContent = "";
+        isLoading = false;
+        return;
+      }
+      if (!cache.productIds || cache.productIds.length === 0){
+        status.textContent = "No products in this collection yet.";
+        itemsCount.textContent = "0 items";
+        hasMore = false;
+        updateLoadMoreUI();
+        isLoading = false;
+        return;
+      }
+    }
+
+    if (min !== null && max !== null && min > max) {
+      status.textContent = "Min price cannot be greater than Max price.";
+      isLoading = false;
+      return;
+    }
+
+    // Count (only on first load)
+    if (isFirst){
+      try{
+        let countQ = supabase
+          .from("products")
+          .select("id", { count: "exact", head: true })
+          .eq("is_active", true)
+          .eq("category", type);
+
+        if (selectedSlug) countQ = countQ.in("id", cache.productIds);
+        if (fab && cache.fabricId) countQ = countQ.eq("fabric_id", cache.fabricId);
+        if (min !== null) countQ = countQ.gte("price_inr", min);
+        if (max !== null) countQ = countQ.lte("price_inr", max);
+        if (inStockOnly) countQ = countQ.gt("inventory_qty", 0);
+
+        const { count } = await countQ;
+        if (typeof count === "number"){
+          itemsCount.textContent = `${count} items`;
+          applyFiltersBtn.textContent = count ? `See ${count} items` : "See items";
+        } else {
+          itemsCount.textContent = "";
+          applyFiltersBtn.textContent = "See items";
+        }
+      } catch(e){
+        itemsCount.textContent = "";
+        applyFiltersBtn.textContent = "See items";
+      }
+    }
+
+    // Data query (PAGE_SIZE + 1 so we can detect hasMore)
+    let query = supabase
+      .from("products")
+      .select("id,title,price_inr,sale_price_inr,inventory_qty,reserved_qty,is_active,created_at,view_count,product_images(image_url, sort_order)")
+      .eq("is_active", true)
+      .eq("category", type);
+
+    if (selectedSlug) query = query.in("id", cache.productIds);
+    if (fab && cache.fabricId) query = query.eq("fabric_id", cache.fabricId);
+    if (min !== null) query = query.gte("price_inr", min);
+    if (max !== null) query = query.lte("price_inr", max);
+    if (inStockOnly) query = query.gt("inventory_qty", 0);
+
+    if (sort === "mostLoved") query = query.order("view_count", { ascending: false }).order("created_at", { ascending: false });
+    else if (sort === "priceLow") query = query.order("price_inr", { ascending: true });
+    else if (sort === "priceHigh") query = query.order("price_inr", { ascending: false });
+    else query = query.order("created_at", { ascending: false });
+
+    const from = offset;
+    const to = offset + PAGE_SIZE; // inclusive -> fetch PAGE_SIZE+1
+    query = query.range(from, to);
+
+    const { data, error } = await query;
+
+    if (error){
+      status.textContent = "Error: " + error.message;
+      isLoading = false;
+      return;
+    }
+
+    const rows = data ?? [];
+    hasMore = rows.length > PAGE_SIZE;
+    const slice = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+
+    const normalized = normalize(slice);
+
+    if (isFirst) status.textContent = "";
+    if (isFirst && normalized.length === 0){
+      status.textContent = "No products found.";
+      hasMore = false;
+      updateLoadMoreUI();
+      isLoading = false;
+      return;
+    }
+
+    grid.insertAdjacentHTML("beforeend", normalized.map(productCard).join(""));
+
+    offset += slice.length;
+
+    updateLoadMoreUI();
+    isLoading = false;
+  }
+
+  function resetAndLoad(){
+    hasMore = true;
+    offset = 0;
+    loadNextPage(true);
+  }
+// Init control values from URL
   document.getElementById("minPrice").value = params.get("min") || "";
   document.getElementById("maxPrice").value = params.get("max") || "";
   document.getElementById("sortBy").value = params.get("sort") || "newest";
@@ -349,7 +542,7 @@
   // Sort applies immediately (like Nalli)
   document.getElementById("sortBy").addEventListener("change", (e) => {
     setParam("sort", e.target.value);
-    loadProducts();
+    resetAndLoad();
   });
 
   // Apply button applies price + refreshes products, then closes drawer
@@ -360,13 +553,14 @@
     // NEW: Save stock filter
     setParam("inStock", document.getElementById("inStockOnly").checked ? "true" : "");
     
-    loadProducts();
+    resetAndLoad();
     closeDrawer();
   });
 
   // Clear all resets everything
   document.getElementById("clearAll").addEventListener("click", () => {
     params.delete("collection"); 
+    params.delete("fabric"); 
     params.delete("min"); 
     params.delete("max"); 
     params.delete("sort");
@@ -381,13 +575,25 @@
     document.getElementById("inStockOnly").checked = false;
 
     loadCollections();
-    loadProducts();
+    resetAndLoad();
     closeDrawer();
   });
 
   // Init
   loadCollections();
-  loadProducts();
+  loadFabrics();
+  resetAndLoad();
+
+  // Load more button
+  loadMoreBtn.addEventListener("click", () => loadNextPage(false));
+
+  // Infinite scroll (lazy loading)
+  if ("IntersectionObserver" in window) {
+    const obs = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting)) loadNextPage(false);
+    }, { rootMargin: "600px" });
+    obs.observe(sentinel);
+  }
 </script>
 
 </body>

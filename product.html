@@ -35,7 +35,7 @@
             <div id="thumbs" class="pd-thumbs"></div>
 
             <div class="pd-main">
-              <img id="mainImg" alt="" />
+              <img id="mainImg" alt="" loading="eager" decoding="async" />
             </div>
           </div>
           <div class="small" style="margin-top:10px; opacity:.7;">Click image to zoom</div>
@@ -108,7 +108,7 @@
   <!-- Lightbox -->
   <div id="lightbox" aria-hidden="true">
     <div id="lightboxInner">
-      <img id="lightboxImg" alt="Product image enlarged" />
+      <img id="lightboxImg" alt="Product image enlarged" loading="lazy" decoding="async" />
       <button id="lbClose" class="lb-btn" type="button">✕</button>
       <button id="lbPrev" class="lb-btn" type="button">‹</button>
       <button id="lbNext" class="lb-btn" type="button">›</button>
@@ -205,7 +205,7 @@
         const thumbAlt = escapeAttr(img.alt_text ?? data.title ?? "");
         return `
           <button class="pd-thumb" data-idx="${idx}" type="button" aria-label="View image ${idx + 1}">
-            <img src="${thumbSrc}" alt="${thumbAlt}">
+            <img src="${thumbSrc}" alt="${thumbAlt}" loading="lazy" decoding="async">
           </button>
         `;
       }).join("");

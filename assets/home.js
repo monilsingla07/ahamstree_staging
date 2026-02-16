@@ -27,6 +27,75 @@ function normalizeProducts(rows = []) {
   });
 }
 
+
+async function hydrateCategoryTiles(){
+  const box = document.getElementById("homeCategoryTiles");
+  if (!box) return;
+
+  // Fallback tiles (shown if the fabrics table doesn't exist yet)
+  const fallback = [
+    { name: "Silk", slug: "silk", description: "Wedding & festive" },
+    { name: "Cotton", slug: "cotton", description: "Everyday comfort" },
+    { name: "Banarasi", slug: "banarasi", description: "Classic zari" },
+    { name: "Kanjivaram", slug: "kanjivaram", description: "Iconic weaves" }
+  ];
+
+  try{
+    const { data, error } = await supabase
+      .from("fabrics")
+      .select("name,slug,description,sort_order,is_active")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true });
+
+    const rows = (error || !data || data.length === 0) ? fallback : data;
+    box.innerHTML = rows.map(f => `
+      <a class="cat-tile" href="products.html?type=saree&fabric=${encodeURIComponent(f.slug)}">
+        <div class="cat-title">${escapeHtml(f.name)}</div>
+        <div class="cat-sub">${escapeHtml(f.description || "")}</div>
+      </a>
+    `).join("");
+  } catch(e){
+    box.innerHTML = fallback.map(f => `
+      <a class="cat-tile" href="products.html?type=saree&fabric=${encodeURIComponent(f.slug)}">
+        <div class="cat-title">${escapeHtml(f.name)}</div>
+        <div class="cat-sub">${escapeHtml(f.description || "")}</div>
+      </a>
+    `).join("");
+  }
+}
+
+async function hydrateHomeCollections(){
+  const box = document.getElementById("homeCollectionTiles");
+  if (!box) return;
+
+  try{
+    const { data, error } = await supabase
+      .from("collections")
+      .select("name,slug,description,is_active,created_at")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(6);
+
+    if (error) throw error;
+
+    const rows = data ?? [];
+    if (rows.length === 0){
+      box.innerHTML = `<div class="small">No collections yet.</div>`;
+      return;
+    }
+
+    box.innerHTML = rows.map(c => `
+      <a class="cat-tile" href="products.html?collection=${encodeURIComponent(c.slug)}">
+        <div class="cat-title">${escapeHtml(c.name)}</div>
+        <div class="cat-sub">${escapeHtml(c.description || "Explore")}</div>
+      </a>
+    `).join("");
+  } catch(e){
+    box.innerHTML = `<div class="small">Could not load collections.</div>`;
+  }
+}
+
 function productCard(p) {
   const img = p.image_url
     ? `<img src="${safeSrc(p.image_url)}" alt="${escapeAttr(p.title ?? "")}" loading="lazy">`
@@ -106,6 +175,8 @@ async function fetchLatestActive(limit = 6) {
 /* ------------------ MAIN HYDRATOR ------------------ */
 
 export async function hydrateHome() {
+  hydrateCategoryTiles();
+  hydrateHomeCollections();
   try {
     setStatus("bestsellersStatus", "Loading…");
     setStatus("newCollectionStatus", "Loading…");

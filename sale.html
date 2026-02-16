@@ -46,55 +46,112 @@
       return off > 0 ? `${off}% OFF` : "";
     }
 
-    async function loadSale() {
+    async function loadSale(first = false) {
       const status = document.getElementById("status");
       const grid = document.getElementById("grid");
+      const loadMoreRow = document.getElementById("loadMoreRow");
+      const loadMoreBtn = document.getElementById("loadMore");
+      const sentinel = document.getElementById("scrollSentinel");
+
+      const PAGE_SIZE = 24;
+      if (!window.__saleState){
+        window.__saleState = { offset: 0, hasMore: true, isLoading: false };
+      }
+      const st = window.__saleState;
+
+      function updateUI(){
+        if (st.hasMore){
+          loadMoreRow.style.display = "block";
+          loadMoreBtn.disabled = false;
+          loadMoreBtn.textContent = "Load more";
+        } else {
+          loadMoreRow.style.display = "none";
+        }
+      }
+
+      if (st.isLoading || !st.hasMore) return;
+      st.isLoading = true;
+
+      if (first){
+        status.textContent = "Loading…";
+        grid.innerHTML = "";
+        st.offset = 0;
+        st.hasMore = true;
+      } else {
+        loadMoreBtn.textContent = "Loading…";
+        loadMoreBtn.disabled = true;
+      }
+
+      const from = st.offset;
+      const to = st.offset + PAGE_SIZE; // inclusive => PAGE_SIZE+1
 
       const { data, error } = await supabase
         .from("products")
-        .select("id,title,price_inr,sale_price_inr,inventory_qty,is_active, product_images(image_url, sort_order)")
+        .select("id,title,price_inr,sale_price_inr,inventory_qty,reserved_qty,is_active,created_at, product_images(image_url, sort_order)")
         .eq("is_active", true)
         .not("sale_price_inr", "is", null)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(from, to);
 
       if (error) {
         status.textContent = "Error: " + error.message;
+        st.isLoading = false;
         return;
       }
 
+      const rows = data ?? [];
+      st.hasMore = rows.length > PAGE_SIZE;
+      const slice = st.hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+
       status.textContent = "";
 
-      const normalized = (data ?? []).map(p => {
+      const normalized = (slice ?? []).map(p => {
         const imgs = (p.product_images ?? []).slice().sort((a,b)=> (a.sort_order??0)-(b.sort_order??0));
         return { ...p, image_url: imgs[0]?.image_url ?? "" };
       });
 
-      grid.innerHTML = normalized.map(p => {
+      grid.insertAdjacentHTML("beforeend", normalized.map(p => {
         const badge = pctOff(p.price_inr, p.sale_price_inr);
+        const base = Number(p.price_inr || 0);
+        const sale = Number(p.sale_price_inr || 0);
+
         return `
-          <div class="card">
-            <a href="product.html?id=${encodeURIComponent(p.id)}" style="text-decoration:none;color:inherit;">
-              ${p.image_url ? `<img src="${safeSrc(p.image_url)}" alt="${escapeAttr(p.title)}" loading="lazy">` : `<div style="height:280px;background:#fafafa;"></div>`}
+            <div class="card product-card">
+              <a href="product.html?id=${encodeURIComponent(p.id)}" style="text-decoration:none;color:inherit;">
+              ${p.image_url ? `<img src="${safeSrc(p.image_url)}" alt="${escapeAttr(p.title)}" loading="lazy" decoding="async">` : `<div style="height:280px;background:#fafafa;"></div>`}
               <div class="p">
-                <div style="font-weight:900;display:flex;justify-content:space-between;gap:10px;">
-                  <span>${escapeHtml(p.title)}</span>
-                  ${badge ? `<span class="small" style="font-weight:800;">${badge}</span>` : ``}
-                </div>
-                <div style="margin-top:6px;opacity:.9;">
-                  <span style="font-weight:900;">₹${p.sale_price_inr}</span>
-                  <span class="small" style="text-decoration:line-through;opacity:.7;margin-left:8px;">₹${p.price_inr}</span>
-                </div>
-                <div class="small" style="margin-top:6px;">
-                  ${p.inventory_qty > 0 ? `${p.inventory_qty} in stock` : "Sold out"}
+                <div style="font-weight:700;">${escapeHtml(p.title)}</div>
+                <div style="margin-top:6px;">
+                  <span style="text-decoration:line-through;opacity:.6;margin-right:6px;">${money(base)}</span>
+                  <span style="font-weight:800;">${money(sale)}</span>
+                  ${badge ? `<span class="badge sale" style="margin-left:8px;">${escapeHtml(badge)}</span>` : ""}
                 </div>
               </div>
-            </a>
-          </div>
+              </a>
+            </div>
         `;
-      }).join("");
+      }).join(""));
+
+      st.offset += slice.length;
+      updateUI();
+      st.isLoading = false;
+
+      // Hook up events once
+      if (!window.__saleBound){
+        window.__saleBound = true;
+
+        loadMoreBtn.addEventListener("click", () => loadSale(false));
+
+        if ("IntersectionObserver" in window) {
+          const obs = new IntersectionObserver((entries) => {
+            if (entries.some(e => e.isIntersecting)) loadSale(false);
+          }, { rootMargin: "600px" });
+          obs.observe(sentinel);
+        }
+      }
     }
 
-    loadSale();
+loadSale(true);
   </script>
 </body>
 </html>

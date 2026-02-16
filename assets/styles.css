@@ -1338,3 +1338,7 @@ hr { border: none; border-top: 1px solid #eee; margin: 18px 0; }
 .testimonial-name{ font-weight: 900; }
 .testimonial-stars{ letter-spacing: 1px; }
 
+
+
+/* Utility */
+.hidden{display:none !important;}
