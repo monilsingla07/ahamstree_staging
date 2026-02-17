@@ -191,24 +191,30 @@ const testimonials = [
 
     const tGrid = document.getElementById("testimonialsGrid");
     if (tGrid) {
-      tGrid.innerHTML = testimonials.map(t => `
-  <div class="card testimonial-card fancy">
-    <div class="testimonial-corner" aria-hidden="true">❝</div>
+     tGrid.innerHTML = testimonials.map(t => `
+  <div class="card testimonial-card t-card">
 
-    <div class="testimonial-top">
-      <img class="testimonial-avatar" src="${t.img}" alt="${t.name}" loading="lazy">
-      <div class="testimonial-person">
-        <div class="testimonial-name">${t.name}</div>
-        <div class="testimonial-place small">${t.place}</div>
-      </div>
-      <div class="testimonial-stars small" aria-label="${t.stars} stars">${stars(t.stars)}</div>
+    <div class="t-photo-wrap">
+      <img class="t-photo"
+           src="${t.img}"
+           alt="${t.name}"
+           loading="lazy"
+           onerror="this.style.display='none'">
+      <div class="t-quote-icon" aria-hidden="true">❝</div>
     </div>
 
-    <div class="testimonial-quote">“${t.quote}”</div>
+    <div class="t-head">
+      <div class="t-person">
+        <div class="t-name">${t.name}</div>
+        <div class="t-place small">${t.place}</div>
+      </div>
+      <div class="t-stars small" aria-label="${t.stars} stars">${stars(t.stars)}</div>
+    </div>
+
+    <div class="t-quote">“${t.quote}”</div>
   </div>
 `).join("");
-
-    }
+ }
 
 
 
