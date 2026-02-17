@@ -1372,13 +1372,20 @@ hr { border: none; border-top: 1px solid #eee; margin: 18px 0; }
 
 .about-photo{
   width:100%;
-  height:auto;
+  max-height: 520px;      /* increase/decrease this if you want bigger */
+  height: auto;
   border-radius:16px;
   display:block;
-  object-fit:cover;
+
+  object-fit: contain;    /* IMPORTANT: no cropping */
+  object-position: center;
+
+  background: #fff;       /* looks nice if there’s empty space */
   box-shadow: 0 10px 30px rgba(0,0,0,0.10);
   border: 1px solid rgba(0,0,0,0.06);
+  padding: 6px;           /* gives breathing space so top/bottom aren't tight */
 }
+
 
 .about-caption{
   margin-top:10px;
@@ -1402,6 +1409,10 @@ hr { border: none; border-top: 1px solid #eee; margin: 18px 0; }
 @media (max-width: 860px){
   .about-grid{
     grid-template-columns: 1fr;
+  }
+  .about-photo{
+    max-height: 360px;   /* better for phones */
+    padding: 4px;        /* slightly less padding */
   }
   .about-aside{
     position:relative;
