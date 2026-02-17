@@ -1372,8 +1372,8 @@ hr { border: none; border-top: 1px solid #eee; margin: 18px 0; }
 
 .about-photo{
   width:100%;
-  max-height: 720px;      /* increase/decrease this if you want bigger */
-  height: 720px;
+  max-height: 920px;      /* increase/decrease this if you want bigger */
+  height: 920px;
   border-radius:16px;
   display:block;
 
@@ -1411,7 +1411,7 @@ hr { border: none; border-top: 1px solid #eee; margin: 18px 0; }
     grid-template-columns: 1fr;
   }
   .about-photo{
-    max-height: 360px;   /* better for phones */
+    max-height: 560px;   /* better for phones */
     padding: 4px;        /* slightly less padding */
   }
   .about-aside{
