@@ -1421,6 +1421,15 @@ hr { border: none; border-top: 1px solid #eee; margin: 18px 0; }
   }
 }
 
+/* FORCE About image to not crop */
+.about-photo{
+  width: 100% !important;
+  height: auto !important;
+  max-height: 640px;          /* make it taller on desktop */
+  object-fit: contain !important;
+  object-position: center !important;
+  display: block !important;
+}
 
 /* Utility */
 .hidden{display:none !important;}
