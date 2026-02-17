@@ -147,7 +147,7 @@
     <!-- Testimonials -->
     <section class="section">
       <div class="section-head">
-        <h2 class="section-title">Testimonials</h2>
+        <h2 class="section-title">Loved by customers across India</h2>
       </div>
 
       <div id="testimonialsGrid" class="grid grid-3"></div>
@@ -176,29 +176,38 @@
     hydrateHome();
 
     // Testimonials (static for now)
-    const testimonials = [
-      { quote: "Beautiful weave and the saree looked even better in person. Packaging was premium.", name: "Ananya", place: "Bengaluru", stars: 5 },
-      { quote: "Fast delivery and super helpful support on WhatsApp. Loved the fabric quality.", name: "Ritika", place: "Delhi", stars: 5 },
-      { quote: "Exactly as shown. The drape is gorgeous and the blouse piece was perfect.", name: "Meera", place: "Mumbai", stars: 5 },
-      { quote: "Great gifting experience. My mom loved it and asked for another one!", name: "Kavya", place: "Pune", stars: 5 },
-      { quote: "Elegant and lightweight. Perfect for functions and easy to carry.", name: "Sonia", place: "Hyderabad", stars: 5 },
-      { quote: "The craftsmanship is excellent. Will definitely order again.", name: "Priya", place: "Chandigarh", stars: 5 },
-    ];
+    // Testimonials (static for now)
+const testimonials = [
+  { quote: "Beautiful weave and the saree looked even better in person. Packaging was premium.", name: "Babita", place: "Gurgaon", stars: 5, img: "assets/images/testimonials/ananya.jpg" },
+  { quote: "Fast delivery and super helpful support on WhatsApp. Loved the fabric quality.", name: "Sudha", place: "Rewari", stars: 5, img: "assets/images/testimonials/ritika.jpg" },
+  { quote: "Exactly as shown. The drape is gorgeous and the blouse piece was perfect.", name: "Neetu", place: "Jamalpur", stars: 5, img: "assets/images/testimonials/meera.jpg" },
+  { quote: "Great gifting experience. My mom loved it and asked for another one!", name: "Nisha", place: "Gurgaon", stars: 5, img: "assets/images/testimonials/kavya.jpg" },
+  { quote: "Elegant and lightweight. Perfect for functions and easy to carry.", name: "Shikha", place: "Gurgaon", stars: 5, img: "assets/images/testimonials/sonia.jpg" },
+  { quote: "The craftsmanship is excellent. Will definitely order again.", name: "Rachna", place: "Gurgaon", stars: 5, img: "assets/images/testimonials/priya.jpg" },
+];
+
 
     const stars = (n) => "★★★★★".slice(0, Math.max(0, Math.min(5, Number(n || 0))));
 
     const tGrid = document.getElementById("testimonialsGrid");
     if (tGrid) {
       tGrid.innerHTML = testimonials.map(t => `
-        <div class="card testimonial-card">
-          <div class="testimonial-stars small">${stars(t.stars)}</div>
-          <div class="testimonial-quote" style="margin-top:10px;">“${t.quote}”</div>
-          <div class="testimonial-meta">
-            <div class="testimonial-name">${t.name}</div>
-            <div class="small">${t.place}</div>
-          </div>
-        </div>
-      `).join("");
+  <div class="card testimonial-card fancy">
+    <div class="testimonial-corner" aria-hidden="true">❝</div>
+
+    <div class="testimonial-top">
+      <img class="testimonial-avatar" src="${t.img}" alt="${t.name}" loading="lazy">
+      <div class="testimonial-person">
+        <div class="testimonial-name">${t.name}</div>
+        <div class="testimonial-place small">${t.place}</div>
+      </div>
+      <div class="testimonial-stars small" aria-label="${t.stars} stars">${stars(t.stars)}</div>
+    </div>
+
+    <div class="testimonial-quote">“${t.quote}”</div>
+  </div>
+`).join("");
+
     }
 
 
