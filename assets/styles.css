@@ -1447,11 +1447,20 @@ hr { border: none; border-top: 1px solid #eee; margin: 18px 0; }
   position:absolute;
   top:10px;
   right:12px;
-  font-size: 34px;
-  opacity: 0.12;
+  font-size: 26px;   /* smaller */
+  opacity: 0.08;     /* lighter */
   line-height: 1;
   pointer-events:none;
 }
+@media (max-width: 860px){
+  .testimonial-corner{
+    font-size: 18px;
+    opacity: 0.06;
+    top: 8px;
+    right: 10px;
+  }
+}
+
 
 .testimonial-top{
   display:flex;
