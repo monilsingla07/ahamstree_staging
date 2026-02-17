@@ -1357,6 +1357,58 @@ hr { border: none; border-top: 1px solid #eee; margin: 18px 0; }
 .testimonial-name{ font-weight: 900; }
 .testimonial-stars{ letter-spacing: 1px; }
 
+/* About page layout */
+.about-grid{
+  display:grid;
+  grid-template-columns: 1.6fr 0.9fr;
+  gap:22px;
+  align-items:start;
+}
+
+.about-aside{
+  position:sticky;
+  top:16px;
+}
+
+.about-photo{
+  width:100%;
+  height:auto;
+  border-radius:16px;
+  display:block;
+  object-fit:cover;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.10);
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+.about-caption{
+  margin-top:10px;
+  padding:12px 12px;
+  border-radius:14px;
+  border: 1px solid rgba(0,0,0,0.06);
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(8px);
+}
+
+.about-name{
+  font-weight:700;
+}
+
+.about-role{
+  opacity:0.8;
+  font-size: 0.95rem;
+}
+
+/* Mobile: stack image on top */
+@media (max-width: 860px){
+  .about-grid{
+    grid-template-columns: 1fr;
+  }
+  .about-aside{
+    position:relative;
+    top:auto;
+    order:-1; /* show image first on mobile */
+  }
+}
 
 
 /* Utility */
