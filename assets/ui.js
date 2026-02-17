@@ -73,7 +73,7 @@ export function renderHeader(active = "") {
             <a id="accountLinkMobile" class="icon-link" href="login.html" aria-label="Account">
               ${iconUser()}
             </a>
-            <a class="icon-link" href="wishlist.html" aria-label="Wishlist">
+            <a id="wishlistLinkMobile" class="icon-link" href="wishlist.html" aria-label="Wishlist">
               ${iconHeart()}
             </a>
             <a class="icon-link" href="cart.html" aria-label="Cart">
@@ -130,7 +130,7 @@ export function renderHeader(active = "") {
         <div class="utils utils-desktop">
           <a class="util-link" href="search.html" title="Search">Search</a>
           <a id="accountLink" class="util-link" href="login.html" title="Account">Login / Sign up</a>
-<a class="util-link ${active === "wishlist" ? "active" : ""}" href="wishlist.html" title="Wishlist">Wishlist</a>
+<a id="wishlistLink" class="util-link ${active === "wishlist" ? "active" : ""}" href="wishlist.html" title="Wishlist">Wishlist</a>
           <a class="util-link ${active === "cart" ? "active" : ""}" href="cart.html" title="Cart">Cart (${count})</a>
         </div>
       </div>
@@ -332,6 +332,8 @@ export async function hydrateHeaderAuth() {
 
   const aDesktop = document.getElementById("accountLink");
   const aMobile = document.getElementById("accountLinkMobile");
+  const wDesktop = document.getElementById("wishlistLink");
+  const wMobile = document.getElementById("wishlistLinkMobile");
 
   if (!aDesktop && !aMobile) return;
 
@@ -346,6 +348,12 @@ export async function hydrateHeaderAuth() {
   if (aMobile) {
     aMobile.href = loggedIn ? "account.html" : "login.html";
   }
+
+  // Wishlist should open inside Account for logged-in users.
+  // Guest users can still use the standalone wishlist page.
+  const wishlistHref = loggedIn ? "account.html?view=wishlist" : "wishlist.html";
+  if (wDesktop) wDesktop.href = wishlistHref;
+  if (wMobile) wMobile.href = wishlistHref;
 
 
   // Keep it updated automatically after login/logout without page refresh
