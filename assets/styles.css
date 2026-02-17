@@ -1469,14 +1469,15 @@ hr { border: none; border-top: 1px solid #eee; margin: 18px 0; }
   margin-bottom: 10px;
 }
 
+/* Force testimonial images to be small avatars (prevents big empty boxes) */
 .testimonial-avatar{
-  width:44px;
-  height:44px;
-  border-radius: 14px; /* modern rounded square */
-  object-fit: cover;
-  border: 1px solid rgba(0,0,0,0.08);
-  box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+  width:44px !important;
+  height:44px !important;
+  border-radius: 14px !important;
+  object-fit: cover !important;
+  display:block !important;
 }
+
 
 .testimonial-person{
   display:flex;
