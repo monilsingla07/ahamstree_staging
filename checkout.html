@@ -94,6 +94,39 @@
         <label class="small">Pincode</label>
         <input class="input" name="pincode" required maxlength="6" placeholder="e.g., 560001" inputmode="numeric" autocomplete="shipping postal-code" />
 
+        <div style="height:18px;"></div>
+
+        <!-- Payment Method Selector -->
+        <div style="margin-bottom:14px;">
+          <div class="small" style="font-weight:800; margin-bottom:8px;">Payment method</div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+
+            <label id="pmRazorpayLabel" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:2px solid var(--brand);border-radius:12px;cursor:pointer;background:var(--brand-light);transition:all .15s;">
+              <input type="radio" name="payment_method" value="razorpay" id="pmRazorpay" checked style="accent-color:var(--brand);width:16px;height:16px;flex-shrink:0;" />
+              <div style="flex:1;">
+                <div style="font-weight:800;font-size:14px;">Pay Online</div>
+                <div class="small" style="opacity:.75;margin-top:2px;">Cards, UPI, Net Banking via Razorpay</div>
+              </div>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.55;flex-shrink:0;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+            </label>
+
+            <label id="pmCodLabel" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:2px solid var(--border);border-radius:12px;cursor:pointer;background:#fff;transition:all .15s;">
+              <input type="radio" name="payment_method" value="cod" id="pmCod" style="accent-color:var(--brand);width:16px;height:16px;flex-shrink:0;" />
+              <div style="flex:1;">
+                <div style="font-weight:800;font-size:14px;">Cash on Delivery</div>
+                <div class="small" style="opacity:.75;margin-top:2px;">Pay in cash when your order arrives</div>
+              </div>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.55;flex-shrink:0;"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+            </label>
+
+          </div>
+
+          <!-- COD note -->
+          <div id="codNote" style="display:none;margin-top:8px;padding:10px 12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;">
+            <div class="small" style="color:#92400e;">&#x1F4E6; COD orders are confirmed manually. You'll receive a WhatsApp / call confirmation within 2 hours.</div>
+          </div>
+        </div>
+
         <div style="height:14px;"></div>
 
         <button class="btn" type="button" id="payBtn" style="width:100%;">Pay with Razorpay</button>
@@ -696,74 +729,130 @@
     validateAll({ showErrors: false });
 
     // ---------- Pay ----------
+    // ---------- Payment method toggle UI ----------
+    const pmRazorpay    = document.getElementById("pmRazorpay");
+    const pmCod         = document.getElementById("pmCod");
+    const pmRazorpayLbl = document.getElementById("pmRazorpayLabel");
+    const pmCodLbl      = document.getElementById("pmCodLabel");
+    const codNote       = document.getElementById("codNote");
+    const payNote       = document.getElementById("payNote");
+
+    function getPaymentMethod() {
+      return document.querySelector('input[name="payment_method"]:checked')?.value || "razorpay";
+    }
+
+    function updatePaymentUI() {
+      const method = getPaymentMethod();
+      const isRazorpay = method === "razorpay";
+
+      // Highlight selected card
+      pmRazorpayLbl.style.border  = isRazorpay ? "2px solid var(--brand)" : "2px solid var(--border)";
+      pmRazorpayLbl.style.background = isRazorpay ? "var(--brand-light)" : "#fff";
+      pmCodLbl.style.border       = !isRazorpay ? "2px solid var(--brand)" : "2px solid var(--border)";
+      pmCodLbl.style.background   = !isRazorpay ? "var(--brand-light)" : "#fff";
+
+      // Button label
+      payBtn.textContent = isRazorpay ? "Pay with Razorpay" : "Place COD Order";
+
+      // Show/hide COD note and footer note
+      codNote.style.display = isRazorpay ? "none" : "block";
+      if (payNote) payNote.textContent = isRazorpay
+        ? "Payments are processed by Razorpay. You'll be redirected to a secure payment page."
+        : "No payment needed now. Your order will be confirmed via WhatsApp / call.";
+    }
+
+    pmRazorpay?.addEventListener("change", updatePaymentUI);
+    pmCod?.addEventListener("change", updatePaymentUI);
+    updatePaymentUI(); // set initial state
+
+    // ---------- Pay / Place Order ----------
     let isProcessing = false;
 
     payBtn.addEventListener("click", async () => {
       form.querySelectorAll("input[name]").forEach(i => (i.dataset.touched = "1"));
       const ok = validateAll({ showErrors: true });
       if (!ok) return;
-
       if (isProcessing) return;
+
+      const method = getPaymentMethod();
 
       try {
         isProcessing = true;
         payBtn.disabled = true;
-        payBtn.textContent = "Processing…";
         clearError();
-        statusEl.textContent = "Creating payment…";
 
         const cartMod = await import("./assets/cart.js");
-        const sbMod = await import("./assets/supabase.js");
+        const sbMod   = await import("./assets/supabase.js");
 
         const cart = cartMod.getCart?.() || [];
         if (!cart.length) {
           showError("Your cart is empty. Please add products first.");
-          statusEl.textContent = "";
           return;
         }
 
-        // Must be logged in (your create-payment-link function requires it)
         const { data: sess } = await sbMod.supabase.auth.getSession();
         const session = sess?.session;
         if (!session?.access_token) {
-          showError("You are not logged in. Please login before paying.");
-          statusEl.textContent = "";
+          showError("You are not logged in. Please login before placing your order.");
           return;
         }
 
-        const shipping = buildShipping();
-        const payloadCart = cart.map(i => ({ product_id: i.product_id, qty: i.qty }));
+        const shipping     = buildShipping();
+        const payloadCart  = cart.map(i => ({ product_id: i.product_id, qty: i.qty }));
 
-        // IMPORTANT: Match create-payment-link function expected fields
-        const { data, error } = await sbMod.supabase.functions.invoke("create-payment-link", {
-          body: {
-            cart: payloadCart,
-            coupon_code: (appliedCoupon || null),
-            customer_name: shipping.full_name,
-            customer_phone: shipping.phone,
-            customer_email: shipping.email || null,
-            shipping_address: shipping,
-            shipping_inr: 0
-          },
-          headers: {
-            Authorization: `Bearer ${session.access_token}`
-          }
-        });
+        // ── RAZORPAY FLOW ──────────────────────────────────────────────
+        if (method === "razorpay") {
+          payBtn.textContent = "Processing…";
+          statusEl.textContent = "Creating payment link…";
 
-        if (error) {
-          showError(error.message || "Payment setup failed. Please try again.");
-          statusEl.textContent = "";
-          return;
+          const { data, error } = await sbMod.supabase.functions.invoke("create-payment-link", {
+            body: {
+              cart: payloadCart,
+              coupon_code: (appliedCoupon || null),
+              customer_name:  shipping.full_name,
+              customer_phone: shipping.phone,
+              customer_email: shipping.email || null,
+              shipping_address: shipping,
+              shipping_inr: 0
+            },
+            headers: { Authorization: `Bearer ${session.access_token}` }
+          });
+
+          if (error) { showError(error.message || "Payment setup failed."); return; }
+          if (!data?.payment_link_url) { showError(data?.error || "Payment setup failed."); return; }
+
+          statusEl.textContent = "Redirecting to Razorpay…";
+          window.location.href = data.payment_link_url;
+
+        // ── CASH ON DELIVERY FLOW ─────────────────────────────────────
+        } else {
+          payBtn.textContent = "Placing order…";
+          statusEl.textContent = "Placing your COD order…";
+
+          const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order", {
+            body: {
+              cart: payloadCart,
+              coupon_code: (appliedCoupon || null),
+              customer_name:  shipping.full_name,
+              customer_phone: shipping.phone,
+              customer_email: shipping.email || null,
+              shipping_address: shipping,
+              shipping_inr: 0,
+              payment_method: "cod"
+            },
+            headers: { Authorization: `Bearer ${session.access_token}` }
+          });
+
+          if (error) { showError(error.message || "Could not place COD order. Please try again."); return; }
+
+          const orderId = data?.order_id || data?.id || "";
+
+          // Clear cart
+          cartMod.clearCart?.();
+
+          statusEl.textContent = "Order placed! Redirecting…";
+          window.location.href = "success.html" + (orderId ? `?order_id=${encodeURIComponent(orderId)}&method=cod` : "?method=cod");
         }
-
-        if (!data?.payment_link_url) {
-          showError(data?.error || "Payment setup failed. Please try again.");
-          statusEl.textContent = "";
-          return;
-        }
-
-        statusEl.textContent = "Redirecting to Razorpay…";
-        window.location.href = data.payment_link_url;
 
       } catch (e) {
         showError(String(e?.message ?? e));
@@ -771,7 +860,8 @@
         console.error(e);
       } finally {
         isProcessing = false;
-        payBtn.textContent = "Pay with Razorpay";
+        payBtn.disabled = false;
+        updatePaymentUI(); // restore correct button label
         validateAll({ showErrors: false });
       }
     });
