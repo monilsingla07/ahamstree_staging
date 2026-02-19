@@ -902,9 +902,13 @@
           payBtn.textContent = "Placing order…";
           statusEl.textContent = "Placing your COD order…";
 
-          // NOTE: We do not send Authorization header for COD.
-          // The Supabase gateway (verify_jwt=false via config.toml) lets it through.
-          // We pass user_id in the body so the function can link the order to the account.
+          // IMPORTANT: Supabase Edge Functions still require an Authorization header
+          // (even when verify_jwt=false). For guests, send the project's anon/publishable key.
+          // For logged-in users, send their access token.
+          const authHeader = token
+            ? `Bearer ${token}`
+            : `Bearer ${sbMod.SUPABASE_ANON_KEY}`;
+
           const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order", {
             body: {
               cart: payloadCart,
@@ -916,7 +920,8 @@
               shipping_inr: 0,
               payment_method: "cod",
               user_id: sess?.session?.user?.id ?? null
-            }
+            },
+            headers: { Authorization: authHeader }
           });
 
           if (error) { showError(error.message || "Could not place COD order. Please try again."); return; }
