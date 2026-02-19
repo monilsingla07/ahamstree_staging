@@ -1062,7 +1062,7 @@ hr { border: none; border-top: 1px solid #eee; margin: 18px 0; }
 .bullets { padding-left: 18px; margin: 0; }
 .bullets li { margin: 6px 0; }
 
-..products-layout{
+.products-layout{
   display:grid;
   grid-template-columns: 260px 1fr;
   gap: 14px;
