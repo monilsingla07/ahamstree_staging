@@ -112,13 +112,25 @@
         <div id="summaryItems" style="display:flex; flex-direction:column; gap:10px;"></div>
 
         <!-- Coupon -->
-        <div id="couponBox" style="margin-top:12px;">
-          <div class="small" style="font-weight:800;">Coupon</div>
-          <div class="row" style="margin-top:8px; gap:10px;">
-            <input id="couponInput" class="input" placeholder="Enter code (e.g., WELCOME10)" style="flex:1;" />
-            <button id="applyCoupon" type="button" class="btn secondary" style="height:40px;">Apply</button>
+        <div id="couponBox" style="margin-top:14px;">
+          <button id="couponToggle" type="button" style="display:flex;align-items:center;gap:8px;background:var(--brand-light);border:1.5px dashed var(--brand);border-radius:12px;padding:10px 14px;width:100%;cursor:pointer;color:var(--brand);font-weight:700;font-size:14px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+            <span id="couponToggleLabel">Have a coupon? Tap to apply</span>
+          </button>
+
+          <!-- Coupon Panel (hidden by default) -->
+          <div id="couponPanel" style="display:none; margin-top:10px; border:1px solid var(--border); border-radius:14px; padding:14px; background:#fff;">
+            <div style="font-weight:800; font-size:13px; margin-bottom:10px;">Available coupons</div>
+
+            <div id="couponOptions" style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;"></div>
+
+            <div style="font-weight:700; font-size:12px; opacity:.7; margin-bottom:6px;">Or enter a code manually</div>
+            <div style="display:flex; gap:8px;">
+              <input id="couponInput" class="input" placeholder="e.g. WELCOME10" style="flex:1; font-size:14px;" autocapitalize="characters" />
+              <button id="applyCoupon" type="button" class="btn" style="height:42px; padding:0 16px; flex-shrink:0;">Apply</button>
+            </div>
+            <div id="couponMsg" class="small" style="margin-top:8px; min-height:18px;"></div>
           </div>
-          <div id="couponMsg" class="small" style="margin-top:6px; opacity:.85;"></div>
         </div>
 
         <div style="height:12px;"></div>
@@ -300,12 +312,10 @@
         const okStock = !!p && active && available > 0 && qty <= available;
         if (!okStock) hasStockIssue = true;
 
-        // Price rule: if sale_price_inr is set, use it; else use price_inr
-        const unitPrice = Number(
-          (p?.sale_price_inr !== null && p?.sale_price_inr !== undefined)
-            ? p.sale_price_inr
-            : (p?.price_inr ?? i.price_inr ?? 0)
-        );
+        // Price rule: if sale_price_inr is set and lower, use it; else use price_inr
+        const basePrice = Number(p?.price_inr ?? i.price_inr ?? 0);
+        const hasSale = p?.sale_price_inr != null && Number(p.sale_price_inr) > 0 && Number(p.sale_price_inr) < basePrice;
+        const unitPrice = hasSale ? Number(p.sale_price_inr) : basePrice;
 
         const lineTotal = unitPrice * qty;
         subtotal += lineTotal;
@@ -336,7 +346,12 @@
               <div style="font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                 ${safeTitle}
               </div>
-              <div class="small" style="opacity:.75;">${money(unitPrice)} × ${qty}</div>
+              <div class="small" style="opacity:.75;">
+                ${hasSale
+                  ? `<span style="text-decoration:line-through;opacity:.55;margin-right:5px;">${money(basePrice)}</span><span style="color:var(--brand);font-weight:700;">${money(unitPrice)}</span>`
+                  : money(unitPrice)
+                } × ${qty}
+              </div>
               ${stockText ? `<div class="small" style="color:crimson; margin-top:2px;">${stockText}</div>` : ""}
             </div>
 
@@ -598,29 +613,85 @@
     // ---------- Init ----------
     statusEl.textContent = "";
 
-    // Coupon UI
-    const couponInput = document.getElementById("couponInput");
+    // ---------- Coupon UI ----------
+    // Always clear any previously stored coupon on page load
+    localStorage.removeItem("ahamstree_coupon");
+    appliedCoupon = "";
+
+    // Available coupons to display in the panel
+    const AVAILABLE_COUPONS = [
+      { code: "WELCOME10", label: "10% off", description: "10% off your first order • No minimum spend" },
+      { code: "AHAM15",    label: "15% off", description: "15% off on orders above ₹2,000" },
+      { code: "SAREE5",    label: "₹500 off", description: "Flat ₹500 off on sarees above ₹3,000" },
+    ];
+
+    const couponToggle   = document.getElementById("couponToggle");
+    const couponPanel    = document.getElementById("couponPanel");
+    const couponInput    = document.getElementById("couponInput");
     const applyCouponBtn = document.getElementById("applyCoupon");
+    const couponOptions  = document.getElementById("couponOptions");
+    const couponMsg      = document.getElementById("couponMsg");
+    const couponToggleLabel = document.getElementById("couponToggleLabel");
 
-    if (couponInput) couponInput.value = appliedCoupon;
+    // Render available coupon chips
+    if (couponOptions) {
+      couponOptions.innerHTML = AVAILABLE_COUPONS.map(c => `
+        <button type="button" class="coupon-chip" data-code="${c.code}"
+          style="display:flex;align-items:center;justify-content:space-between;gap:10px;
+                 border:1.5px dashed var(--border);border-radius:10px;padding:10px 12px;
+                 background:#fafafa;cursor:pointer;text-align:left;width:100%;
+                 transition:border-color .15s,background .15s;">
+          <div>
+            <span style="font-weight:800;font-size:13px;color:var(--brand);">${c.code}</span>
+            <span style="margin-left:8px;font-size:12px;font-weight:700;background:var(--brand);color:#fff;padding:2px 7px;border-radius:999px;">${c.label}</span>
+            <div style="font-size:12px;opacity:.7;margin-top:3px;">${c.description}</div>
+          </div>
+          <span style="font-size:12px;font-weight:800;color:var(--brand);white-space:nowrap;">Tap to apply →</span>
+        </button>
+      `).join("");
 
-    const applyCouponNow = async () => {
-      const code = String(couponInput?.value || "").trim().toUpperCase();
-      appliedCoupon = code;
-      localStorage.setItem("ahamstree_coupon", appliedCoupon);
-      await renderOrderSummary({ coupon_code: appliedCoupon });
-    };
+      couponOptions.querySelectorAll(".coupon-chip").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const code = btn.dataset.code;
+          if (couponInput) couponInput.value = code;
+          applyCouponNow(code);
+        });
+      });
+    }
 
-    applyCouponBtn?.addEventListener("click", applyCouponNow);
-    couponInput?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        applyCouponNow();
-      }
+    // Toggle panel open/close
+    couponToggle?.addEventListener("click", () => {
+      const isOpen = couponPanel.style.display !== "none";
+      couponPanel.style.display = isOpen ? "none" : "block";
+      couponToggle.style.borderStyle = isOpen ? "dashed" : "solid";
     });
 
-    // First render
-    renderOrderSummary({ coupon_code: appliedCoupon });
+    const applyCouponNow = async (code) => {
+      code = String(code ?? couponInput?.value ?? "").trim().toUpperCase();
+      appliedCoupon = code;
+      if (code) {
+        localStorage.setItem("ahamstree_coupon", code);
+        if (couponToggleLabel) couponToggleLabel.textContent = `Coupon: ${code} ✓`;
+        couponToggle.style.background = "rgba(34,197,94,0.08)";
+        couponToggle.style.borderColor = "rgba(34,197,94,0.5)";
+        couponToggle.style.color = "#166534";
+      } else {
+        localStorage.removeItem("ahamstree_coupon");
+        if (couponToggleLabel) couponToggleLabel.textContent = "Have a coupon? Tap to apply";
+        couponToggle.style.background = "";
+        couponToggle.style.borderColor = "";
+        couponToggle.style.color = "";
+      }
+      await renderOrderSummary({ coupon_code: code });
+    };
+
+    applyCouponBtn?.addEventListener("click", () => applyCouponNow());
+    couponInput?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); applyCouponNow(); }
+    });
+
+    // First render — no coupon applied by default
+    renderOrderSummary({ coupon_code: "" });
     attachLiveValidation();
     validateAll({ showErrors: false });
 

@@ -256,11 +256,9 @@
         const reserved = Number(p?.reserved_qty ?? 0);
         const availableQty = Math.max(0, inv - reserved);
 
-        const unitPrice = Number(
-          (p?.sale_price_inr && p?.sale_price_inr > 0 && p?.sale_price_inr < p?.price_inr)
-            ? p.sale_price_inr
-            : (p?.price_inr ?? i.price_inr ?? 0)
-        );
+        const basePrice = Number(p?.price_inr ?? i.price_inr ?? 0);
+        const hasSale = p?.sale_price_inr != null && Number(p.sale_price_inr) > 0 && Number(p.sale_price_inr) < basePrice;
+        const unitPrice = hasSale ? Number(p.sale_price_inr) : basePrice;
 
         const title = p?.title || i.title || "Item";
 
@@ -300,7 +298,12 @@
             </div>
             <div style="flex:1;min-width:0;">
               <div style="font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${safeTitleText}</div>
-              <div style="margin-top:6px;opacity:.85;">${money(unitPrice)}</div>
+              <div style="margin-top:6px;opacity:.85;">
+                ${hasSale
+                  ? `<span style="text-decoration:line-through;opacity:.55;margin-right:6px;font-size:13px;">${money(basePrice)}</span><span style="color:var(--brand);font-weight:800;">${money(unitPrice)}</span>`
+                  : money(unitPrice)
+                }
+              </div>
               ${soldOut ? `<div class="small" style="margin-top:6px;color:crimson;">Sold out</div>` : ``}
               ${(!soldOut && max > 0) ? `<div class="small" style="margin-top:6px;opacity:.75;">Available: ${max}</div>` : ``}
               <div class="row" style="margin-top:10px;">
