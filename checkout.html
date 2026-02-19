@@ -890,7 +890,7 @@ const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order"
           statusEl.textContent = "Placing your COD order…";
 
           const publicKey = getPublicKey(sbMod);
-          const authHeader = `Bearer ${token || publicKey}`;
+          const authHeader = `Bearer ${publicKey}`;
 
           if (!publicKey && !token) {
             showError("Missing Supabase public key export in assets/supabase.js (SUPABASE_ANON_KEY or SUPABASE_PUBLISHABLE_KEY).");
