@@ -289,10 +289,10 @@ const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order"
     customer_email: shipping.email || null,
     shipping_address: shipping,
     shipping_inr: 0,
-    payment_method: "cod",
-    user_id: sess?.session?.user?.id ?? null
+    payment_method: "cod"
   }
 });
+
 
 
         if (error) {
