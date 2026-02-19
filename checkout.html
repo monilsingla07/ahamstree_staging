@@ -146,7 +146,7 @@
         <button class="btn" type="button" id="payBtn" style="width:100%;">Pay with Razorpay</button>
         <div id="status" class="small" style="margin-top:10px;"></div>
 
-        <div class="small" style="margin-top:12px; opacity:.8;">
+        <div id="payNote" class="small" style="margin-top:12px; opacity:.8;">
           Note: Payments are processed by Razorpay. You’ll be redirected to a secure payment page.
         </div>
       </form>
@@ -233,33 +233,16 @@
       warnText.textContent = "";
     };
 
+    // Helper: safely pick a public key name from your supabase.js exports
+    function getPublicKey(sbMod) {
+      return (
+        sbMod.SUPABASE_ANON_KEY ||
+        sbMod.SUPABASE_PUBLISHABLE_KEY ||
+        sbMod.SUPABASE_KEY ||
+        ""
+      );
+    }
 
-const { data: sess } = await sbMod.supabase.auth.getSession();
-const session = sess?.session;
-const token = session?.access_token ?? null;
-
-const authHeader = token
-  ? `Bearer ${token}`
-  : `Bearer ${sbMod.SUPABASE_ANON_KEY}`;
-
-const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order", {
-  body: {
-    cart: payloadCart,
-    coupon_code: (appliedCoupon || null),
-    customer_name:  shipping.full_name,
-    customer_phone: shipping.phone,
-    customer_email: shipping.email || null,
-    shipping_address: shipping,
-    shipping_inr: 0,
-    payment_method: "cod",
-    user_id: sess?.session?.user?.id ?? null
-  },
-  headers: { Authorization: authHeader }
-});
-
-
-
-    
     // ---------- Money / Summary ----------
     // Fallback only. Server (quote-order) should be the source of truth.
     const GST_RATE = 0.05; // fallback only
@@ -289,18 +272,27 @@ const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order"
       return { gst, taxable: net };
     }
 
-    // ✅ FIXED: complete function (your earlier paste got cut and broke the script)
+    // Quote from server (stock + discount + gst + total)
     async function tryServerQuote({ cart, coupon_code }) {
       try {
         const sbMod = await import("./assets/supabase.js");
 
-        // Add Authorization header only if user is logged in
         const { data: sess } = await sbMod.supabase.auth.getSession();
-        const token = sess?.session?.access_token;
+        const token = sess?.session?.access_token ?? null;
+
+        const publicKey = getPublicKey(sbMod);
+        const authHeader = `Bearer ${token || publicKey}`;
+
+        if (!publicKey && !token) {
+          // Not fatal; just fall back to client-side totals
+          return { ok: false, error: "Missing Supabase public key export in assets/supabase.js" };
+        }
 
         const { data, error } = await sbMod.supabase.functions.invoke("quote-order", {
           body: { cart, coupon_code },
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
+          headers: {
+            Authorization: authHeader
+          }
         });
 
         if (error) {
@@ -354,7 +346,6 @@ const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order"
       }
 
       // Fetch latest product info (stock + price)
-      // IMPORTANT: include reserved_qty so we can compute available = inventory - reserved
       const ids = Array.from(new Set(items.map(i => String(i.product_id))));
       const { data: products, error: prodErr } = await sbMod.supabase
         .from("products")
@@ -386,7 +377,6 @@ const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order"
         const okStock = !!p && active && available > 0 && qty <= available;
         if (!okStock) hasStockIssue = true;
 
-        // Price rule: if sale_price_inr is set and lower, use it; else use price_inr
         const basePrice = Number(p?.price_inr ?? i.price_inr ?? 0);
         const hasSale = p?.sale_price_inr != null && Number(p.sale_price_inr) > 0 && Number(p.sale_price_inr) < basePrice;
         const unitPrice = hasSale ? Number(p.sale_price_inr) : basePrice;
@@ -441,11 +431,10 @@ const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order"
         clearError();
       }
 
-      let shipping = 0; // free shipping for now (can be replaced by server value)
+      let shipping = 0;
       let discount = 0;
       let gst = calcGST(subtotal - discount + shipping).gst;
 
-      // Default total (fallback)
       let total = GST_INCLUDED_IN_PRICE
         ? (subtotal - discount + shipping)
         : (subtotal - discount + shipping + gst);
@@ -453,21 +442,17 @@ const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order"
       const code = String(coupon_code || "").trim().toUpperCase();
       const payloadCart = items.map(i => ({ product_id: i.product_id, qty: i.qty }));
 
-      // Try server quote ALWAYS (works even without coupon, gives GST breakdown correctly)
       const q = await tryServerQuote({ cart: payloadCart, coupon_code: code || null });
 
       if (q.ok && q.data) {
-        // Use server totals
         subtotal = Number(q.data.subtotal_inr ?? subtotal);
         discount = Number(q.data.discount_inr ?? 0);
         shipping = Number(q.data.shipping_inr ?? shipping);
         gst = Number(q.data.gst_inr ?? gst);
         total = Number(q.data.total_inr ?? total);
 
-        // GST label from server (preferred)
         if (gstLabel) gstLabel.textContent = q.data.gst_included ? "GST (included)" : "GST";
 
-        // Coupon messaging from server
         if (couponMsg) {
           if (code) {
             const c = q.data.coupon;
@@ -478,27 +463,19 @@ const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order"
           }
         }
 
-        // If server detected stock issues, block payment too
         if (Array.isArray(q.data.issues) && q.data.issues.length) {
           cartOk = false;
           showError(q.data.issues.join(" • "));
         }
       } else {
-        // Fallback label + coupon message when quote-order not deployed
         if (gstLabel) gstLabel.textContent = GST_INCLUDED_IN_PRICE ? "GST (included)" : "GST";
-
         if (couponMsg) {
-          const details = q?.error ? ` (${q.error})` : "";
-          couponMsg.textContent = code
-            ? `Coupon preview not available yet. Please check quote-order deployment/secrets.${details}`
-            : "";
+          couponMsg.textContent = code ? `Coupon preview not available yet. (${q.error || "quote-order error"})` : "";
         }
       }
 
-      // Update GST display
       if (gstEl) gstEl.textContent = money(gst);
 
-      // Discount row
       if (discountRow && discountEl) {
         if (discount > 0) {
           discountRow.style.display = "flex";
@@ -688,11 +665,9 @@ const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order"
     statusEl.textContent = "";
 
     // ---------- Coupon UI ----------
-    // Always clear any previously stored coupon on page load
     localStorage.removeItem("ahamstree_coupon");
     appliedCoupon = "";
 
-    // Available coupons to display in the panel
     const AVAILABLE_COUPONS = [
       { code: "WELCOME10", label: "10% off", description: "10% off your first order • No minimum spend" },
       { code: "AHAM15",    label: "15% off", description: "15% off on orders above ₹2,000" },
@@ -707,7 +682,6 @@ const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order"
     const couponMsg      = document.getElementById("couponMsg");
     const couponToggleLabel = document.getElementById("couponToggleLabel");
 
-    // Render available coupon chips
     if (couponOptions) {
       couponOptions.innerHTML = AVAILABLE_COUPONS.map(c => `
         <button type="button" class="coupon-chip" data-code="${c.code}"
@@ -733,7 +707,6 @@ const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order"
       });
     }
 
-    // Toggle panel open/close
     couponToggle?.addEventListener("click", () => {
       const isOpen = couponPanel.style.display !== "none";
       couponPanel.style.display = isOpen ? "none" : "block";
@@ -772,22 +745,19 @@ const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order"
       const loginHint = document.getElementById("loginHint");
 
       if (!user) {
-        // Guest — show soft login nudge, but don't block
         if (loginHint) {
           loginHint.innerHTML = `<a href="login.html?next=checkout.html" style="color:var(--brand);font-weight:700;">Log in</a> to use your saved address.`;
         }
         return;
       }
 
-      // Logged in — try to load profile address
-      // NOTE: profiles table uses user_id as the key, not id
       const { data: profile } = await sbMod.supabase
         .from("profiles")
         .select("full_name,phone,address_line1,address_line2,city,state,pincode")
         .eq("user_id", user.id)
         .maybeSingle();
 
-      if (!profile || !profile.address_line1) return; // no saved address
+      if (!profile || !profile.address_line1) return;
 
       const banner  = document.getElementById("savedAddressBanner");
       const preview = document.getElementById("savedAddressPreview");
@@ -797,7 +767,6 @@ const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order"
       preview.textContent = `${profile.full_name || ""} • ${parts.join(", ")}`;
       banner.style.display = "block";
 
-      // "Use this address" — fills the form
       document.getElementById("useSavedAddress")?.addEventListener("click", () => {
         const set = (name, val) => {
           const el = form.querySelector(`[name="${name}"]`);
@@ -814,18 +783,15 @@ const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order"
         validateAll({ showErrors: false });
       });
 
-      // "Enter new" — just hide the banner
       document.getElementById("dismissSavedAddress")?.addEventListener("click", () => {
         banner.style.display = "none";
       });
     })();
 
-    // First render — no coupon applied by default
     renderOrderSummary({ coupon_code: "" });
     attachLiveValidation();
     validateAll({ showErrors: false });
 
-    // ---------- Pay ----------
     // ---------- Payment method toggle UI ----------
     const pmRazorpay    = document.getElementById("pmRazorpay");
     const pmCod         = document.getElementById("pmCod");
@@ -842,25 +808,22 @@ const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order"
       const method = getPaymentMethod();
       const isRazorpay = method === "razorpay";
 
-      // Highlight selected card
       pmRazorpayLbl.style.border  = isRazorpay ? "2px solid var(--brand)" : "2px solid var(--border)";
       pmRazorpayLbl.style.background = isRazorpay ? "var(--brand-light)" : "#fff";
       pmCodLbl.style.border       = !isRazorpay ? "2px solid var(--brand)" : "2px solid var(--border)";
       pmCodLbl.style.background   = !isRazorpay ? "var(--brand-light)" : "#fff";
 
-      // Button label
       payBtn.textContent = isRazorpay ? "Pay with Razorpay" : "Place COD Order";
 
-      // Show/hide COD note and footer note
       codNote.style.display = isRazorpay ? "none" : "block";
       if (payNote) payNote.textContent = isRazorpay
-        ? "Payments are processed by Razorpay. You'll be redirected to a secure payment page."
+        ? "Note: Payments are processed by Razorpay. You’ll be redirected to a secure payment page."
         : "No payment needed now. Your order will be confirmed via WhatsApp / call.";
     }
 
     pmRazorpay?.addEventListener("change", updatePaymentUI);
     pmCod?.addEventListener("change", updatePaymentUI);
-    updatePaymentUI(); // set initial state
+    updatePaymentUI();
 
     // ---------- Pay / Place Order ----------
     let isProcessing = false;
@@ -891,7 +854,6 @@ const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order"
         const session = sess?.session;
         const token   = session?.access_token ?? null;
 
-        // Razorpay always requires login (payment link is tied to user account)
         if (method === "razorpay" && !token) {
           showError("Please log in to pay online. COD is available without logging in.");
           return;
@@ -900,7 +862,6 @@ const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order"
         const shipping     = buildShipping();
         const payloadCart  = cart.map(i => ({ product_id: i.product_id, qty: i.qty }));
 
-        // ── RAZORPAY FLOW ──────────────────────────────────────────────
         if (method === "razorpay") {
           payBtn.textContent = "Processing…";
           statusEl.textContent = "Creating payment link…";
@@ -924,17 +885,17 @@ const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order"
           statusEl.textContent = "Redirecting to Razorpay…";
           window.location.href = data.payment_link_url;
 
-        // ── CASH ON DELIVERY FLOW ─────────────────────────────────────
         } else {
           payBtn.textContent = "Placing order…";
           statusEl.textContent = "Placing your COD order…";
 
-          // IMPORTANT: Supabase Edge Functions still require an Authorization header
-          // (even when verify_jwt=false). For guests, send the project's anon/publishable key.
-          // For logged-in users, send their access token.
-          const authHeader = token
-            ? `Bearer ${token}`
-            : `Bearer ${sbMod.SUPABASE_ANON_KEY}`;
+          const publicKey = getPublicKey(sbMod);
+          const authHeader = `Bearer ${token || publicKey}`;
+
+          if (!publicKey && !token) {
+            showError("Missing Supabase public key export in assets/supabase.js (SUPABASE_ANON_KEY or SUPABASE_PUBLISHABLE_KEY).");
+            return;
+          }
 
           const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order", {
             body: {
@@ -955,7 +916,6 @@ const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order"
 
           const orderId = data?.order_id || data?.id || "";
 
-          // Clear cart
           cartMod.clearCart?.();
 
           statusEl.textContent = "Order placed! Redirecting…";
@@ -969,7 +929,7 @@ const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order"
       } finally {
         isProcessing = false;
         payBtn.disabled = false;
-        updatePaymentUI(); // restore correct button label
+        updatePaymentUI();
         validateAll({ showErrors: false });
       }
     });
