@@ -902,7 +902,9 @@
           payBtn.textContent = "Placing order…";
           statusEl.textContent = "Placing your COD order…";
 
-          const codHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+          // NOTE: We do not send Authorization header for COD.
+          // The Supabase gateway (verify_jwt=false via config.toml) lets it through.
+          // We pass user_id in the body so the function can link the order to the account.
           const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order", {
             body: {
               cart: payloadCart,
@@ -912,9 +914,9 @@
               customer_email: shipping.email || null,
               shipping_address: shipping,
               shipping_inr: 0,
-              payment_method: "cod"
-            },
-            headers: codHeaders
+              payment_method: "cod",
+              user_id: sess?.session?.user?.id ?? null
+            }
           });
 
           if (error) { showError(error.message || "Could not place COD order. Please try again."); return; }
