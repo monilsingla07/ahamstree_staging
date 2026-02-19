@@ -233,6 +233,33 @@
       warnText.textContent = "";
     };
 
+
+const { data: sess } = await sbMod.supabase.auth.getSession();
+const session = sess?.session;
+const token = session?.access_token ?? null;
+
+const authHeader = token
+  ? `Bearer ${token}`
+  : `Bearer ${sbMod.SUPABASE_ANON_KEY}`;
+
+const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order", {
+  body: {
+    cart: payloadCart,
+    coupon_code: (appliedCoupon || null),
+    customer_name:  shipping.full_name,
+    customer_phone: shipping.phone,
+    customer_email: shipping.email || null,
+    shipping_address: shipping,
+    shipping_inr: 0,
+    payment_method: "cod",
+    user_id: sess?.session?.user?.id ?? null
+  },
+  headers: { Authorization: authHeader }
+});
+
+
+
+    
     // ---------- Money / Summary ----------
     // Fallback only. Server (quote-order) should be the source of truth.
     const GST_RATE = 0.05; // fallback only
