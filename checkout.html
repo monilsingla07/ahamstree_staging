@@ -42,6 +42,20 @@
       <div class="small" id="authText"></div>
     </div>
 
+    <!-- Saved address banner (shown for logged-in users with a saved address) -->
+    <div id="savedAddressBanner" style="display:none; margin-bottom:12px; padding:14px 16px; border-radius:16px; border:1.5px solid var(--brand); background:var(--brand-light);">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <div>
+          <div style="font-weight:800; font-size:14px;">📍 Use your saved address?</div>
+          <div class="small" style="margin-top:4px; opacity:.8;" id="savedAddressPreview"></div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button type="button" id="useSavedAddress" class="btn" style="padding:8px 14px; font-size:13px;">Use this address</button>
+          <button type="button" id="dismissSavedAddress" class="btn secondary" style="padding:8px 14px; font-size:13px;">Enter new</button>
+        </div>
+      </div>
+    </div>
+
     <div id="warn" class="card" style="padding:12px 14px; border-radius:16px; display:none; border:1px solid rgba(220,20,60,.22); margin-bottom:12px;">
       <div class="small" style="color:crimson;" id="warnText"></div>
     </div>
@@ -51,7 +65,7 @@
       <!-- LEFT: Shipping -->
       <form id="form" class="card" style="padding:16px; border-radius:16px;">
         <h3 style="margin:0 0 8px 0;">Shipping details</h3>
-        <div class="small" style="opacity:.8; margin-bottom:12px;">Used for delivery updates and invoice.</div>
+        <div class="small" style="opacity:.8; margin-bottom:12px;">Used for delivery updates and invoice. <span id="loginHint"></span></div>
 
         <label class="small">Full name</label>
         <input class="input" name="full_name" required placeholder="e.g., Monil Gupta" autocomplete="name" autocapitalize="words" />
@@ -723,6 +737,61 @@
       if (e.key === "Enter") { e.preventDefault(); applyCouponNow(); }
     });
 
+    // ── Saved address + login state ─────────────────────────────────────────
+    (async () => {
+      const sbMod = await import("./assets/supabase.js");
+      const { data: sess } = await sbMod.supabase.auth.getSession();
+      const user  = sess?.session?.user;
+      const loginHint = document.getElementById("loginHint");
+
+      if (!user) {
+        // Guest — show soft login nudge, but don't block
+        if (loginHint) {
+          loginHint.innerHTML = `<a href="login.html?next=checkout.html" style="color:var(--brand);font-weight:700;">Log in</a> to use your saved address.`;
+        }
+        return;
+      }
+
+      // Logged in — try to load profile address
+      const { data: profile } = await sbMod.supabase
+        .from("profiles")
+        .select("full_name,phone,address_line1,address_line2,city,state,pincode")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!profile || !profile.address_line1) return; // no saved address
+
+      const banner  = document.getElementById("savedAddressBanner");
+      const preview = document.getElementById("savedAddressPreview");
+      if (!banner || !preview) return;
+
+      const parts = [profile.address_line1, profile.address_line2, profile.city, profile.state, profile.pincode].filter(Boolean);
+      preview.textContent = `${profile.full_name || ""} • ${parts.join(", ")}`;
+      banner.style.display = "block";
+
+      // "Use this address" — fills the form
+      document.getElementById("useSavedAddress")?.addEventListener("click", () => {
+        const set = (name, val) => {
+          const el = form.querySelector(`[name="${name}"]`);
+          if (el && val) { el.value = val; el.dataset.touched = "1"; }
+        };
+        set("full_name",    profile.full_name);
+        set("phone",        profile.phone);
+        set("address_line1", profile.address_line1);
+        set("address_line2", profile.address_line2);
+        set("city",         profile.city);
+        set("state",        profile.state);
+        set("pincode",      profile.pincode);
+        banner.style.display = "none";
+        validateAll({ showErrors: false });
+      });
+
+      // "Enter new" — just hide the banner
+      document.getElementById("dismissSavedAddress")?.addEventListener("click", () => {
+        banner.style.display = "none";
+      });
+    })();
+
     // First render — no coupon applied by default
     renderOrderSummary({ coupon_code: "" });
     attachLiveValidation();
@@ -792,8 +861,11 @@
 
         const { data: sess } = await sbMod.supabase.auth.getSession();
         const session = sess?.session;
-        if (!session?.access_token) {
-          showError("You are not logged in. Please login before placing your order.");
+        const token   = session?.access_token ?? null;
+
+        // Razorpay always requires login (payment link is tied to user account)
+        if (method === "razorpay" && !token) {
+          showError("Please log in to pay online. COD is available without logging in.");
           return;
         }
 
@@ -829,6 +901,7 @@
           payBtn.textContent = "Placing order…";
           statusEl.textContent = "Placing your COD order…";
 
+          const codHeaders = token ? { Authorization: `Bearer ${token}` } : {};
           const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order", {
             body: {
               cart: payloadCart,
@@ -840,7 +913,7 @@
               shipping_inr: 0,
               payment_method: "cod"
             },
-            headers: { Authorization: `Bearer ${session.access_token}` }
+            headers: codHeaders
           });
 
           if (error) { showError(error.message || "Could not place COD order. Please try again."); return; }
