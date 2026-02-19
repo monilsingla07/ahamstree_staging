@@ -280,20 +280,20 @@
         const { data: sess } = await sbMod.supabase.auth.getSession();
         const token = sess?.session?.access_token ?? null;
 
-        const publicKey = getPublicKey(sbMod);
-        const authHeader = `Bearer ${token || publicKey}`;
+const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order", {
+  body: {
+    cart: payloadCart,
+    coupon_code: (appliedCoupon || null),
+    customer_name:  shipping.full_name,
+    customer_phone: shipping.phone,
+    customer_email: shipping.email || null,
+    shipping_address: shipping,
+    shipping_inr: 0,
+    payment_method: "cod",
+    user_id: sess?.session?.user?.id ?? null
+  }
+});
 
-        if (!publicKey && !token) {
-          // Not fatal; just fall back to client-side totals
-          return { ok: false, error: "Missing Supabase public key export in assets/supabase.js" };
-        }
-
-        const { data, error } = await sbMod.supabase.functions.invoke("quote-order", {
-          body: { cart, coupon_code },
-          headers: {
-            Authorization: authHeader
-          }
-        });
 
         if (error) {
           return { ok: false, error: error.message || "Quote error", details: error };
