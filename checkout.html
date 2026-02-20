@@ -259,7 +259,7 @@
         //      - the user's session JWT if logged in
         //      - the anon key if guest
         //    Overriding it manually caused "Bearer undefined" → 401.
-        const { data, error } = await sbMod.supabase.functions.invoke("create-cod-order", {
+        const { data, error } = await sbMod.supabase.functions.invoke("quote-order", {
           body: {
             cart,
             coupon_code:      coupon_code || null,
