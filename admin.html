@@ -214,103 +214,134 @@
     document.getElementById("footer").innerHTML = renderFooter();
     hydrateHeaderAuth();
 
-    const loadingState = document.getElementById("loadingState");
-    const dashboard    = document.getElementById("dashboard");
-    const statusMsg    = document.getElementById("statusMsg");
+    var loadingState = document.getElementById("loadingState");
+    var dashboard    = document.getElementById("dashboard");
+    var statusMsg    = document.getElementById("statusMsg");
 
-    // ── 1. Auth check ─────────────────────────────────────────────────────
-    const { data: sess } = await supabase.auth.getSession();
-    if (!sess?.session) {
-      window.location.href = "login.html";
-      throw new Error("redirect");
+    function showError(emoji, title, message) {
+      loadingState.style.display = "block";
+      dashboard.style.display = "none";
+      loadingState.innerHTML =
+        '<div class="admin-gate">' +
+          '<div style="font-size:48px;">' + emoji + '</div>' +
+          '<h3 style="margin:0;">' + title + '</h3>' +
+          '<div class="small" style="opacity:.7;">' + message + '</div>' +
+          '<a class="btn secondary" href="index.html" style="margin-top:8px;">Go to store</a>' +
+        '</div>';
     }
-
-    // ── 2. Admin check — verify email is in admin_users ───────────────────
-    const { data: adminRow } = await supabase
-      .from("admin_users")
-      .select("email")
-      .eq("email", sess.session.user.email?.toLowerCase())
-      .maybeSingle();
-
-    if (!adminRow) {
-      loadingState.innerHTML = `
-        <div class="admin-gate">
-          <div style="font-size:48px;">🔒</div>
-          <h3 style="margin:0;">Access Denied</h3>
-          <div class="small" style="opacity:.7;">Your account does not have admin access.</div>
-          <a class="btn secondary" href="index.html" style="margin-top:8px;">Go to store</a>
-        </div>`;
-      return;
-    }
-
-    // ── 3. Show dashboard ─────────────────────────────────────────────────
-    loadingState.style.display = "none";
-    dashboard.style.display = "block";
 
     function money(v) {
       return "₹" + Number(v || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
     }
 
-    function metricCard(label, value, sub = "", cls = "") {
-      return `
-        <div class="metric-card ${cls}">
-          <div class="metric-label">${label}</div>
-          <div class="metric-value">${value}</div>
-          ${sub ? `<div class="metric-sub">${sub}</div>` : ""}
-        </div>`;
+    function metricCard(label, value, sub, cls) {
+      sub = sub || "";
+      cls = cls || "";
+      var subHtml = sub ? '<div class="metric-sub">' + sub + '</div>' : "";
+      return '<div class="metric-card ' + cls + '">' +
+        '<div class="metric-label">' + label + '</div>' +
+        '<div class="metric-value">' + value + '</div>' +
+        subHtml +
+        '</div>';
     }
 
     async function loadDashboard() {
       statusMsg.textContent = "Loading metrics…";
 
-      const { data, error } = await supabase.functions.invoke("admin-dashboard");
+      var result = await supabase.functions.invoke("admin-dashboard");
 
-      if (error) {
-        statusMsg.textContent = "Error loading metrics: " + error.message;
+      if (result.error) {
+        statusMsg.textContent = "Error loading metrics: " + result.error.message;
         return;
       }
 
+      var data = result.data;
+
       // Action needed callout
-      const actionNeeded = document.getElementById("actionNeeded");
-      const needsAction = (data.codPendingCount || 0) + (data.confirmedCount || 0);
+      var actionNeeded = document.getElementById("actionNeeded");
+      var needsAction = (data.codPendingCount || 0) + (data.confirmedCount || 0);
       if (needsAction > 0) {
         actionNeeded.style.display = "block";
         document.getElementById("actionNeededText").textContent =
-          `${needsAction} COD order${needsAction > 1 ? "s" : ""} need${needsAction === 1 ? "s" : ""} to be confirmed and shipped.`;
+          needsAction + " COD order" + (needsAction > 1 ? "s" : "") +
+          " need" + (needsAction === 1 ? "s" : "") + " to be confirmed and shipped.";
       } else {
         actionNeeded.style.display = "none";
       }
 
       // Order metrics
       document.getElementById("metricsOrders").innerHTML = [
-        metricCard("Total Orders",     data.ordersCount || 0,     `${data.recentOrders7d || 0} in last 7 days`),
+        metricCard("Total Orders",     data.ordersCount || 0,     (data.recentOrders7d || 0) + " in last 7 days", ""),
         metricCard("COD Pending",      data.codPendingCount || 0, "Awaiting confirmation", data.codPendingCount > 0 ? "warn" : ""),
         metricCard("COD Confirmed",    data.confirmedCount || 0,  "Ready to ship",         data.confirmedCount > 0 ? "warn" : ""),
         metricCard("Paid (Online)",    data.paidCount || 0,       "Ready to ship",         ""),
-        metricCard("Shipped",          data.shippedCount || 0,    "In transit"),
-        metricCard("Delivered",        data.deliveredCount || 0,  "Completed"),
-        metricCard("Payment Pending",  data.pendingCount || 0,    "Online payment awaited"),
-        metricCard("Failed/Cancelled", (data.failedCount || 0) + (data.cancelledCount || 0), ""),
-        metricCard("Registered Users", data.usersCount || "—",   "Total accounts"),
+        metricCard("Shipped",          data.shippedCount || 0,    "In transit",            ""),
+        metricCard("Delivered",        data.deliveredCount || 0,  "Completed",             ""),
+        metricCard("Payment Pending",  data.pendingCount || 0,    "Online payment awaited",""),
+        metricCard("Failed/Cancelled", (data.failedCount || 0) + (data.cancelledCount || 0), "", ""),
+        metricCard("Registered Users", data.usersCount || "—",   "Total accounts",        ""),
       ].join("");
 
       // Revenue metrics
       document.getElementById("metricsRevenue").innerHTML = [
-        metricCard("Paid Revenue",     money(data.revenuePaidInr),     "From paid + shipped + delivered", "highlight"),
-        metricCard("COD Pipeline",     money(data.revenueConfirmedInr), "From confirmed COD orders"),
-        metricCard("COD Orders",       data.codOrders || 0,            "Total placed"),
-        metricCard("Online Orders",    data.onlineOrders || 0,         "Via Razorpay"),
+        metricCard("Paid Revenue",  money(data.revenuePaidInr),      "From paid + shipped + delivered", "highlight"),
+        metricCard("COD Pipeline",  money(data.revenueConfirmedInr), "From confirmed COD orders",       ""),
+        metricCard("COD Orders",    data.codOrders || 0,             "Total placed",                    ""),
+        metricCard("Online Orders", data.onlineOrders || 0,          "Via Razorpay",                    ""),
       ].join("");
 
       statusMsg.textContent = "Last updated: " + new Date().toLocaleTimeString("en-IN");
     }
 
-    document.getElementById("btnRefresh").onclick = loadDashboard;
+    async function initAdmin() {
+      try {
+        // ── 1. Auth check ────────────────────────────────────────────────
+        var sessResult = await supabase.auth.getSession();
 
-    // Auto-load status filter from URL for quick links
-    const urlStatus = new URLSearchParams(window.location.search).get("status");
+        if (sessResult.error) {
+          showError("⚠️", "Auth Error", sessResult.error.message);
+          return;
+        }
 
-    loadDashboard();
+        if (!sessResult.data || !sessResult.data.session) {
+          window.location.href = "login.html";
+          return;
+        }
+
+        var session = sessResult.data.session;
+
+        // ── 2. Admin check — verify email is in admin_users ──────────────
+        var adminResult = await supabase
+          .from("admin_users")
+          .select("email")
+          .eq("email", session.user.email.toLowerCase())
+          .maybeSingle();
+
+        if (adminResult.error) {
+          showError("⚠️", "Access Check Failed", "Could not verify admin status: " + adminResult.error.message);
+          return;
+        }
+
+        if (!adminResult.data) {
+          showError("🔒", "Access Denied", "Your account does not have admin access.");
+          return;
+        }
+
+        // ── 3. Show dashboard ────────────────────────────────────────────
+        loadingState.style.display = "none";
+        dashboard.style.display = "block";
+
+        document.getElementById("btnRefresh").onclick = loadDashboard;
+
+        loadDashboard();
+
+      } catch (e) {
+        console.error("Admin page error:", e);
+        showError("⚠️", "Something went wrong", e.message || "An unexpected error occurred. Check the browser console for details.");
+      }
+    }
+
+    initAdmin();
   </script>
 </body>
 </html>
