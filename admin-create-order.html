@@ -696,8 +696,11 @@
           })),
         };
 
+        const { data: _sessC } = await supabase.auth.getSession();
+        const _tokC = _sessC?.session?.access_token || "";
         const { data, error } = await supabase.functions.invoke("admin-create-order", {
           body: payload,
+          headers: { Authorization: "Bearer " + _tokC }
         });
 
         if (error) throw new Error(error.message);

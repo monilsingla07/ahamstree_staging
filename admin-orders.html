@@ -398,8 +398,12 @@
       const method = document.getElementById("methodFilter").value;
       const q      = document.getElementById("search").value.trim();
 
+      const { data: sessData } = await supabase.auth.getSession();
+      const accessToken = sessData?.session?.access_token || "";
+
       const { data, error } = await supabase.functions.invoke("admin-orders", {
-        body: { status: st || null, q: q || null }
+        body: { status: st || null, q: q || null },
+        headers: { Authorization: "Bearer " + accessToken }
       });
 
       if (error) {
@@ -420,8 +424,11 @@
 
     // ── Secure status update via edge function ────────────────────────────
     async function updateStatus(orderId, newStatus, extra = {}) {
+      const { data: _sess2 } = await supabase.auth.getSession();
+      const _tok2 = _sess2?.session?.access_token || "";
       const { data, error } = await supabase.functions.invoke("admin-update-order-status", {
-        body: { order_id: orderId, status: newStatus, ...extra }
+        body: { order_id: orderId, status: newStatus, ...extra },
+        headers: { Authorization: "Bearer " + _tok2 }
       });
       if (error) throw new Error(error.message);
       return data;
@@ -499,8 +506,11 @@
           const id = btn.dataset.id;
           btn.disabled    = true;
           btn.textContent = "Working…";
+          const { data: _sess3 } = await supabase.auth.getSession();
+          const _tok3 = _sess3?.session?.access_token || "";
           const { data: r, error } = await supabase.functions.invoke("admin-regenerate-payment-link", {
-            body: { order_id: id }
+            body: { order_id: id },
+            headers: { Authorization: "Bearer " + _tok3 }
           });
           btn.disabled    = false;
           btn.textContent = "Regenerate link";
@@ -516,8 +526,11 @@
           const id = btn.dataset.id;
           btn.disabled    = true;
           btn.textContent = "Generating…";
+          const { data: _sess4 } = await supabase.auth.getSession();
+          const _tok4 = _sess4?.session?.access_token || "";
           const { data: inv, error } = await supabase.functions.invoke("admin-generate-invoice", {
-            body: { order_id: id }
+            body: { order_id: id },
+            headers: { Authorization: "Bearer " + _tok4 }
           });
           btn.disabled    = false;
           btn.textContent = "Generate invoice";
