@@ -248,14 +248,22 @@
     async function loadDashboard() {
       statusMsg.textContent = "Loading metrics…";
 
-      var result = await supabase.functions.invoke("admin-dashboard");
-
-      if (result.error) {
-        statusMsg.textContent = "Error loading metrics: " + result.error.message;
+      var _sessD = await supabase.auth.getSession();
+      var _tokD = (_sessD.data && _sessD.data.session) ? _sessD.data.session.access_token : "";
+      var _respD = await fetch("https://mgmgkwoxirvzdnmayhwq.supabase.co/functions/v1/admin-dashboard", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + _tokD,
+          "apikey": "sb_publishable_mS_exnQ_Am8_GWMNgCb63w_PfvFA7Mz"
+        },
+        body: JSON.stringify({})
+      });
+      var data = await _respD.json();
+      if (!_respD.ok) {
+        statusMsg.textContent = "Error loading metrics: " + (data.error || "HTTP " + _respD.status);
         return;
       }
-
-      var data = result.data;
 
       // Action needed callout
       var actionNeeded = document.getElementById("actionNeeded");

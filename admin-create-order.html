@@ -698,10 +698,17 @@
 
         const { data: _sessC } = await supabase.auth.getSession();
         const _tokC = _sessC?.session?.access_token || "";
-        const { data, error } = await supabase.functions.invoke("admin-create-order", {
-          body: payload,
-          headers: { Authorization: "Bearer " + _tokC }
+        const _respC = await fetch("https://mgmgkwoxirvzdnmayhwq.supabase.co/functions/v1/admin-create-order", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + _tokC,
+            "apikey": "sb_publishable_mS_exnQ_Am8_GWMNgCb63w_PfvFA7Mz"
+          },
+          body: JSON.stringify(payload)
         });
+        const data = await _respC.json();
+        const error = _respC.ok ? null : { message: data.error || ("HTTP " + _respC.status) };
 
         if (error) throw new Error(error.message);
         if (!data?.ok) throw new Error(data?.error || "Unknown error");
