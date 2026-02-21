@@ -14,13 +14,13 @@
   <title>Admin Orders — AhamStree</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
-  
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/styles.css" />
 
   <style>
-    /* Status badges */
-    .sbadge { display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800; }
+    /* ── Status badges ── */
+    .sbadge { display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800;gap:4px; }
+    .sbadge.cod_pending  { background:#fff7ed;color:#9a3412;border:1px solid #fed7aa; }
     .sbadge.confirmed    { background:#dcfce7;color:#166534; }
     .sbadge.paid         { background:#dcfce7;color:#166534; }
     .sbadge.shipped      { background:#dbeafe;color:#1e40af; }
@@ -28,66 +28,91 @@
     .sbadge.pending      { background:#fef9c3;color:#854d0e; }
     .sbadge.failed       { background:#fee2e2;color:#991b1b; }
     .sbadge.cancelled    { background:#f3f4f6;color:#6b7280; }
+    .sbadge.refunded     { background:#f5f3ff;color:#5b21b6; }
 
-    /* Payment method pill */
+    /* ── Payment pill ── */
     .pm-pill { display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700; }
     .pm-pill.cod    { background:#fff7ed;color:#9a3412; }
     .pm-pill.online { background:#eff6ff;color:#1d4ed8; }
 
-    /* COD action card — highlighted */
-    .cod-action-bar { background:#fff7ed;border-top:1px solid #fed7aa;padding:12px 16px; }
+    /* ── Action bars ── */
+    .action-bar { padding:12px 16px;border-top:1px solid var(--border-light,#f3f4f6); }
+    .action-bar.cod-confirm { background:#fff7ed;border-top-color:#fed7aa; }
+    .action-bar.ship-bar    { background:#f0f9ff;border-top-color:#bae6fd; }
 
-    /* Inline AWB input row */
+    /* ── AWB row ── */
     .awb-row { display:flex;gap:8px;align-items:center;margin-top:8px; }
     .awb-row input { flex:1;min-width:0; }
 
-    /* Toast */
+    /* ── Toast ── */
     #toast {
       position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
       background:#111;color:#fff;padding:10px 20px;border-radius:12px;font-size:13px;
-      font-weight:700;opacity:0;transition:all .25s ease;pointer-events:none;z-index:999;
+      font-weight:700;opacity:0;transition:all .25s ease;pointer-events:none;z-index:9999;
       white-space:nowrap;
     }
     #toast.show { opacity:1;transform:translateX(-50%) translateY(0); }
+
+    /* ── Status change row ── */
+    .status-row { display:flex;gap:8px;align-items:center;flex-wrap:wrap; }
+
+    /* ── Order card ── */
+    .order-card { border-radius:16px;overflow:hidden;border:1px solid var(--border,#e5e7eb);background:#fff; }
+    .order-card + .order-card { margin-top:0; }
+
+    /* ── Filters bar ── */
+    .filters-bar { display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center; }
+    .filters-bar .input { height:40px;font-size:13px; }
+
+    /* ── Section label ── */
+    .section-lbl { font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.5;margin-bottom:4px; }
   </style>
 </head>
 
 <body>
   <div id="header"></div>
 
-  <div class="container" style="max-width:980px;">
+  <div class="container" style="max-width:1000px;">
 
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
-      <div>
-        <h2 style="margin:0;">Admin — Orders</h2>
-        <div class="small" style="opacity:.7;margin-top:4px;">Manage all orders. COD orders need manual shipping action.</div>
+    <!-- Loading / auth gate -->
+    <div id="loadingState" style="text-align:center;padding:48px;opacity:.6;font-size:14px;">Verifying admin access…</div>
+
+    <!-- Main content -->
+    <div id="mainContent" style="display:none;">
+
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:18px;">
+        <div>
+          <h2 style="margin:0;">Admin — Orders</h2>
+          <div class="small" style="opacity:.65;margin-top:4px;">Manage all orders. Status updates are reflected on the customer's orders page immediately.</div>
+        </div>
+        <a class="btn secondary" href="admin.html" style="padding:8px 14px;font-size:13px;">← Dashboard</a>
       </div>
-      <a class="btn secondary" href="admin.html">← Back to admin</a>
-    </div>
 
-    <!-- Filters -->
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center;">
-      <select id="statusFilter" class="input" style="max-width:220px;">
-        <option value="">All statuses</option>
-        <option value="confirmed">COD Confirmed (needs shipping)</option>
-        <option value="paid">Paid (needs shipping)</option>
-        <option value="payment_link_created">Payment pending</option>
-        <option value="shipped">Shipped</option>
-        <option value="delivered">Delivered</option>
-        <option value="failed">Failed / Expired</option>
-        <option value="cancelled">Cancelled</option>
-      </select>
-      <select id="methodFilter" class="input" style="max-width:180px;">
-        <option value="">All payment types</option>
-        <option value="cod">Cash on Delivery</option>
-        <option value="razorpay">Online (Razorpay)</option>
-      </select>
-      <input id="search" class="input" placeholder="Search phone or order ID…" style="max-width:280px;" />
-      <button id="btnLoad" class="btn">Refresh</button>
-    </div>
+      <!-- Filters -->
+      <div class="filters-bar">
+        <select id="statusFilter" class="input" style="max-width:230px;">
+          <option value="">All statuses</option>
+          <option value="cod_pending">COD Pending (confirm first)</option>
+          <option value="confirmed">COD Confirmed (ship now)</option>
+          <option value="paid">Paid Online (ship now)</option>
+          <option value="payment_link_created">Payment pending</option>
+          <option value="shipped">Shipped</option>
+          <option value="delivered">Delivered</option>
+          <option value="failed">Failed / Expired</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <select id="methodFilter" class="input" style="max-width:180px;">
+          <option value="">All payment types</option>
+          <option value="cod">Cash on Delivery</option>
+          <option value="razorpay">Online (Razorpay)</option>
+        </select>
+        <input id="search" class="input" placeholder="Search phone or order ID…" style="max-width:260px;" />
+        <button id="btnLoad" class="btn" style="padding:8px 16px;font-size:13px;">Refresh</button>
+      </div>
 
-    <div id="statusMsg" class="small" style="margin-bottom:10px;"></div>
-    <div id="list" style="display:grid;gap:14px;"></div>
+      <div id="statusMsg" class="small" style="margin-bottom:12px;opacity:.6;"></div>
+      <div id="list" style="display:grid;gap:14px;"></div>
+    </div>
   </div>
 
   <div id="toast"></div>
@@ -102,38 +127,67 @@
     document.getElementById("footer").innerHTML = renderFooter();
     hydrateHeaderAuth();
 
-    // ── Auth check ──────────────────────────────────────────────────────────
+    const loadingState = document.getElementById("loadingState");
+    const mainContent  = document.getElementById("mainContent");
+    const statusMsg    = document.getElementById("statusMsg");
+    const list         = document.getElementById("list");
+
+    // ── 1. Auth check ─────────────────────────────────────────────────────
     const { data: sess } = await supabase.auth.getSession();
-    if (!sess?.session) { window.location.href = "login.html"; }
+    if (!sess?.session) {
+      window.location.href = "login.html";
+      throw new Error("redirect");
+    }
 
-    // ── Helpers ─────────────────────────────────────────────────────────────
-    const statusMsg = document.getElementById("statusMsg");
-    const list      = document.getElementById("list");
+    // ── 2. Admin check ────────────────────────────────────────────────────
+    const { data: adminRow } = await supabase
+      .from("admin_users")
+      .select("email")
+      .eq("email", sess.session.user.email?.toLowerCase())
+      .maybeSingle();
 
+    if (!adminRow) {
+      loadingState.innerHTML = `
+        <div style="min-height:50vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;">
+          <div style="font-size:48px;">🔒</div>
+          <h3 style="margin:0;">Access Denied</h3>
+          <div class="small" style="opacity:.7;">Your account does not have admin access.</div>
+          <a class="btn secondary" href="index.html">Go to store</a>
+        </div>`;
+      return;
+    }
+
+    loadingState.style.display = "none";
+    mainContent.style.display  = "block";
+
+    // ── Helpers ───────────────────────────────────────────────────────────
     function money(v) {
       return "₹" + Number(v || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
     }
 
     function toast(msg, color = "#111") {
       const el = document.getElementById("toast");
-      el.textContent = msg;
+      el.textContent  = msg;
       el.style.background = color;
       el.classList.add("show");
-      setTimeout(() => el.classList.remove("show"), 3000);
+      setTimeout(() => el.classList.remove("show"), 3500);
     }
 
     function statusBadge(st) {
       const map = {
-        confirmed:            { label: "COD Confirmed",    cls: "confirmed" },
-        paid:                 { label: "Paid",             cls: "paid"      },
-        payment_link_created: { label: "Payment pending",  cls: "pending"   },
-        payment_link_failed:  { label: "Link failed",      cls: "failed"    },
-        created:              { label: "Payment pending",  cls: "pending"   },
-        failed:               { label: "Failed",           cls: "failed"    },
-        expired:              { label: "Expired",          cls: "failed"    },
-        shipped:              { label: "Shipped",          cls: "shipped"   },
-        delivered:            { label: "Delivered",        cls: "delivered" },
-        cancelled:            { label: "Cancelled",        cls: "cancelled" },
+        cod_pending:          { label: "💵 COD Pending",     cls: "cod_pending" },
+        confirmed:            { label: "✅ COD Confirmed",   cls: "confirmed"   },
+        paid:                 { label: "✅ Paid",            cls: "paid"        },
+        payment_link_created: { label: "⏳ Payment pending", cls: "pending"     },
+        payment_pending:      { label: "⏳ Payment pending", cls: "pending"     },
+        created:              { label: "⏳ Payment pending", cls: "pending"     },
+        payment_link_failed:  { label: "❌ Link failed",     cls: "failed"      },
+        failed:               { label: "❌ Failed",          cls: "failed"      },
+        expired:              { label: "❌ Expired",         cls: "failed"      },
+        shipped:              { label: "🚚 Shipped",         cls: "shipped"     },
+        delivered:            { label: "📬 Delivered",       cls: "delivered"   },
+        cancelled:            { label: "🚫 Cancelled",       cls: "cancelled"   },
+        refunded:             { label: "↩️ Refunded",        cls: "refunded"    },
       };
       const s = map[st] || { label: st || "Unknown", cls: "pending" };
       return `<span class="sbadge ${s.cls}">${s.label}</span>`;
@@ -145,32 +199,40 @@
     }
 
     function waLink(phone, text) {
-      const p = String(phone || "").replace(/\D/g, "");
+      const p    = String(phone || "").replace(/\D/g, "");
       const full = p.length === 10 ? "91" + p : p;
       return `https://wa.me/${full}?text=${encodeURIComponent(text)}`;
     }
 
+    // ── Render a single order card ────────────────────────────────────────
     function renderOrder(o) {
-      const isCod   = o.payment_method === "cod";
-      const isOnline = !isCod;
-      const needsShipping = ["confirmed", "paid"].includes(o.status) && !o.shiprocket_awb;
-      const isShipped     = ["shipped", "delivered"].includes(o.status) || !!o.shiprocket_awb;
-
-      const payHref   = o.razorpay_payment_link_url ? safeHref(o.razorpay_payment_link_url) : "";
-      const canRegen  = isOnline && ["payment_link_created","payment_link_failed","created","failed"].includes(o.status);
-      const canPay    = isOnline && canRegen && !!payHref;
-
-      const phone      = o.customer_phone || "";
-      const shortId    = o.id.slice(0, 8).toUpperCase();
-      const addr       = o.shipping_address;
-      const addrText   = addr
-        ? [addr.address_line1, addr.address_line2, addr.city, addr.state, addr.pincode].filter(Boolean).join(", ")
+      const isCod         = o.payment_method === "cod";
+      const isOnline      = !isCod;
+      const shortId       = o.id.slice(0, 8).toUpperCase();
+      const phone         = o.customer_phone || "";
+      const addr          = o.shipping_address;
+      const addrText      = addr
+        ? [addr.full_name, addr.address_line1, addr.address_line2, addr.city, addr.state, addr.pincode].filter(Boolean).join(", ")
         : "—";
 
-      const items = (o.order_items || []).map(it =>
-        `<div class="small" style="padding:5px 0;border-bottom:1px solid var(--border-light);">
-           ${Number(it.qty) || 0} × ${escapeHtml(it.title)}
-           <span style="float:right;font-weight:700;">${money(it.price_inr)}</span>
+      // Which actions are relevant
+      const isCodPending  = o.status === "cod_pending";
+      const needsShipping = ["confirmed", "paid"].includes(o.status) && !o.shiprocket_awb;
+      const isShipped     = ["shipped", "delivered"].includes(o.status) || !!o.shiprocket_awb;
+      const canRegen      = isOnline && ["payment_link_created", "payment_link_failed", "created", "failed", "payment_pending"].includes(o.status);
+      const payHref       = o.razorpay_payment_link_url ? safeHref(o.razorpay_payment_link_url) : "";
+
+      // WhatsApp message templates
+      const siteRoot      = window.location.origin;
+      const confirmMsg    = `Hi ${o.customer_name || "there"}, your AhamStree Cash on Delivery order #${shortId} is confirmed! Total: ${money(o.total_inr)}. We'll dispatch it soon. 🙏`;
+      const shippedMsg    = `Hi ${o.customer_name || "there"}, your AhamStree order #${shortId} has been shipped! 🎉 Track here: ${siteRoot}/track.html?awb=${encodeURIComponent(o.shiprocket_awb || "")}`;
+      const reminderMsg   = `Hi ${o.customer_name || "there"}, your AhamStree order #${shortId} payment is pending. Complete it here: ${o.razorpay_payment_link_url || ""}`;
+
+      // Items list
+      const itemsHtml = (o.order_items || []).map(it =>
+        `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid #f3f4f6;">
+           <span class="small">${Number(it.qty)}× ${escapeHtml(it.title)}</span>
+           <span class="small" style="font-weight:700;white-space:nowrap;">${money(it.price_inr)}</span>
          </div>`
       ).join("");
 
@@ -180,56 +242,51 @@
              <span class="small" style="color:green;font-weight:700;">−${money(o.discount_inr)}</span>
            </div>` : "";
 
-      // WhatsApp message templates
-      const confirmMsg  = `Hi ${escapeHtml(o.customer_name || "there")}, your AhamStree Cash on Delivery order (#${shortId}) is confirmed! Total: ${money(o.total_inr)}. We'll dispatch it soon. 🙏`;
-      const shippedMsg  = `Hi ${escapeHtml(o.customer_name || "there")}, your AhamStree order (#${shortId}) has been shipped! 🎉 Track it here: ${window.location.origin}/track.html?awb=${encodeURIComponent(o.shiprocket_awb || "")}`;
-      const reminderMsg = `Hi ${escapeHtml(o.customer_name || "there")}, your AhamStree order (#${shortId}) payment is pending. Complete it here: ${o.razorpay_payment_link_url || ""}`;
-
       return `
-        <div class="card" style="border-radius:16px;overflow:hidden;" data-order-id="${escapeAttr(o.id)}">
+        <div class="order-card" data-order-id="${escapeAttr(o.id)}">
 
-          <!-- Header -->
+          <!-- ── Header ── -->
           <div style="padding:14px 16px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
             <div>
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
-                <span style="font-weight:900;">Order #${shortId}</span>
+                <span style="font-weight:900;font-size:15px;">Order #${shortId}</span>
                 ${statusBadge(o.status)}
                 ${paymentPill(o.payment_method)}
-                ${needsShipping ? `<span style="background:#fef3c7;color:#b45309;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;">⚠ Needs shipping</span>` : ""}
+                ${isCodPending  ? `<span style="background:#fef3c7;color:#b45309;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;">⚠ Needs confirmation</span>` : ""}
+                ${needsShipping ? `<span style="background:#dbeafe;color:#1e40af;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;">📦 Ready to ship</span>` : ""}
               </div>
-              <div class="small" style="opacity:.7;">${new Date(o.created_at).toLocaleString("en-IN", {day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}</div>
+              <div class="small" style="opacity:.6;">${new Date(o.created_at).toLocaleString("en-IN", { day:"numeric", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" })}</div>
             </div>
-
-            <!-- Admin action buttons -->
+            <!-- Top actions -->
             <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-              ${canPay  ? `<a class="btn secondary" style="padding:8px 12px;font-size:12px;" href="${payHref}" target="_blank" rel="noopener noreferrer">View payment link</a>` : ""}
-              ${canRegen ? `<button class="btn secondary" style="padding:8px 12px;font-size:12px;" data-action="regen" data-id="${escapeAttr(o.id)}">Regenerate link</button>` : ""}
-              <button class="btn secondary" style="padding:8px 12px;font-size:12px;" data-action="invoice" data-id="${escapeAttr(o.id)}">Generate invoice</button>
+              ${payHref ? `<a class="btn secondary" style="padding:7px 12px;font-size:12px;" href="${payHref}" target="_blank" rel="noopener noreferrer">View payment link</a>` : ""}
+              ${canRegen ? `<button class="btn secondary" style="padding:7px 12px;font-size:12px;" data-action="regen" data-id="${escapeAttr(o.id)}">Regenerate link</button>` : ""}
+              <button class="btn secondary" style="padding:7px 12px;font-size:12px;" data-action="invoice" data-id="${escapeAttr(o.id)}">Generate invoice</button>
             </div>
           </div>
 
-          <!-- Customer + address -->
-          <div style="padding:0 16px 12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <!-- ── Customer + Address ── -->
+          <div style="padding:0 16px 12px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div>
-              <div class="small" style="font-weight:800;opacity:.6;margin-bottom:4px;">CUSTOMER</div>
+              <div class="section-lbl">Customer</div>
               <div style="font-weight:700;">${escapeHtml(o.customer_name || "—")}</div>
               <div class="small">${escapeHtml(phone || "—")}</div>
-              ${o.customer_email ? `<div class="small" style="opacity:.7;">${escapeHtml(o.customer_email)}</div>` : ""}
+              ${o.customer_email ? `<div class="small" style="opacity:.6;">${escapeHtml(o.customer_email)}</div>` : ""}
             </div>
             <div>
-              <div class="small" style="font-weight:800;opacity:.6;margin-bottom:4px;">SHIP TO</div>
+              <div class="section-lbl">Ship to</div>
               <div class="small" style="line-height:1.5;">${escapeHtml(addrText)}</div>
             </div>
           </div>
 
-          <!-- Order items -->
-          <div style="padding:0 16px 12px;">
-            <div class="small" style="font-weight:800;opacity:.6;margin-bottom:6px;">ITEMS</div>
-            ${items || `<div class="small" style="opacity:.6;">No items.</div>`}
+          <!-- ── Items ── -->
+          <div style="padding:0 16px 10px;">
+            <div class="section-lbl">Items</div>
+            ${itemsHtml || `<div class="small" style="opacity:.5;">No items recorded.</div>`}
           </div>
 
-          <!-- Totals -->
-          <div style="padding:10px 16px;border-top:1px solid var(--border-light);background:#fafafa;font-size:13px;">
+          <!-- ── Totals ── -->
+          <div style="padding:10px 16px;border-top:1px solid #f3f4f6;background:#fafafa;font-size:13px;">
             ${discountRow}
             <div style="display:flex;justify-content:space-between;gap:8px;margin-top:4px;">
               <span style="opacity:.7;">Shipping</span><span>${money(o.shipping_inr)}</span>
@@ -239,27 +296,32 @@
             </div>
           </div>
 
-          <!-- WhatsApp quick actions -->
-          ${phone ? `
-          <div style="padding:10px 16px;border-top:1px solid var(--border-light);display:flex;gap:8px;flex-wrap:wrap;">
-            <div class="small" style="width:100%;font-weight:800;opacity:.6;margin-bottom:2px;">WHATSAPP</div>
-            ${isCod ? `<a class="btn secondary" style="padding:7px 12px;font-size:12px;" href="${safeHref(waLink(phone, confirmMsg))}" target="_blank" rel="noopener noreferrer">✅ Confirm COD order</a>` : ""}
-            ${o.shiprocket_awb ? `<a class="btn secondary" style="padding:7px 12px;font-size:12px;" href="${safeHref(waLink(phone, shippedMsg))}" target="_blank" rel="noopener noreferrer">🚚 Share tracking</a>` : ""}
-            ${isOnline && canRegen ? `<a class="btn secondary" style="padding:7px 12px;font-size:12px;" href="${safeHref(waLink(phone, reminderMsg))}" target="_blank" rel="noopener noreferrer">🔔 Payment reminder</a>` : ""}
-            <a class="btn secondary" data-wa-invoice href="#" style="padding:7px 12px;font-size:12px;" data-phone="${escapeAttr(phone)}" data-id="${escapeAttr(o.id)}">📄 Send invoice</a>
+          <!-- ── COD Confirm action (only for cod_pending) ── -->
+          ${isCodPending ? `
+          <div class="action-bar cod-confirm">
+            <div style="font-weight:800;font-size:13px;margin-bottom:6px;">💵 Confirm this COD order</div>
+            <div class="small" style="color:#92400e;margin-bottom:10px;">
+              Confirm you've spoken to the customer and the order is valid. This changes status to "Confirmed" and the customer will see it updated on their orders page.
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn" style="padding:9px 16px;font-size:13px;" data-action="confirm-cod" data-id="${escapeAttr(o.id)}">
+                ✅ Confirm COD order
+              </button>
+              <button class="btn secondary" style="padding:9px 16px;font-size:13px;color:crimson;border-color:crimson;" data-action="update-status" data-id="${escapeAttr(o.id)}" data-status="cancelled">
+                Cancel order
+              </button>
+            </div>
           </div>` : ""}
 
-          <!-- COD shipping action bar — only shown when order needs to be shipped -->
+          <!-- ── Ship action (confirmed or paid, no AWB yet) ── -->
           ${needsShipping ? `
-          <div class="cod-action-bar">
-            <div style="font-weight:800;font-size:13px;margin-bottom:8px;">
-              ${isCod ? "📦 Mark as shipped (COD)" : "📦 Mark as shipped"}
-            </div>
-            <div class="small" style="opacity:.8;margin-bottom:10px;">
-              Once you've created the shipment in Shiprocket, enter the AWB number below to mark this order as shipped. The customer will be able to track it.
+          <div class="action-bar ship-bar">
+            <div style="font-weight:800;font-size:13px;margin-bottom:6px;">📦 Mark as shipped</div>
+            <div class="small" style="color:#1e40af;margin-bottom:10px;">
+              Once dispatched via Shiprocket, enter the AWB to update the customer's tracking.
             </div>
             <div class="awb-row">
-              <input class="input awb-input" placeholder="Enter Shiprocket AWB number (e.g. 788830567028)"
+              <input class="input awb-input" placeholder="Shiprocket AWB number (e.g. 788830567028)"
                      data-id="${escapeAttr(o.id)}" style="font-size:13px;" />
               <button class="btn" style="padding:10px 16px;font-size:13px;white-space:nowrap;"
                       data-action="ship" data-id="${escapeAttr(o.id)}">
@@ -268,7 +330,7 @@
             </div>
           </div>` : ""}
 
-          <!-- AWB info when already shipped -->
+          <!-- ── AWB info when already shipped ── -->
           ${isShipped && o.shiprocket_awb ? `
           <div style="padding:10px 16px;background:#eff6ff;border-top:1px solid #bfdbfe;">
             <div class="small" style="color:#1e40af;">
@@ -278,24 +340,45 @@
             </div>
           </div>` : ""}
 
-          <!-- Status change (delivered / cancelled) -->
-          ${["shipped","confirmed","paid"].includes(o.status) ? `
-          <div style="padding:10px 16px;border-top:1px solid var(--border-light);display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <div class="small" style="font-weight:800;opacity:.6;">UPDATE STATUS:</div>
-            ${o.status === "shipped" ? `
-              <button class="btn secondary" style="padding:7px 12px;font-size:12px;" data-action="status" data-id="${escapeAttr(o.id)}" data-status="delivered">
+          <!-- ── Status change (delivered / cancelled) for shipped orders ── -->
+          ${o.status === "shipped" ? `
+          <div class="action-bar">
+            <div class="section-lbl" style="margin-bottom:8px;">Update status</div>
+            <div class="status-row">
+              <button class="btn secondary" style="padding:7px 12px;font-size:12px;" data-action="update-status" data-id="${escapeAttr(o.id)}" data-status="delivered">
                 ✅ Mark delivered
-              </button>` : ""}
-            <button class="btn secondary" style="padding:7px 12px;font-size:12px;color:crimson;border-color:crimson;"
-                    data-action="status" data-id="${escapeAttr(o.id)}" data-status="cancelled">
-              Cancel order
-            </button>
+              </button>
+              <button class="btn secondary" style="padding:7px 12px;font-size:12px;color:crimson;border-color:crimson;" data-action="update-status" data-id="${escapeAttr(o.id)}" data-status="cancelled">
+                Cancel order
+              </button>
+            </div>
           </div>` : ""}
+
+          <!-- ── Cancel for confirmed orders that haven't shipped ── -->
+          ${o.status === "confirmed" ? `
+          <div class="action-bar">
+            <div class="status-row">
+              <button class="btn secondary" style="padding:7px 12px;font-size:12px;color:crimson;border-color:crimson;" data-action="update-status" data-id="${escapeAttr(o.id)}" data-status="cancelled">
+                Cancel order
+              </button>
+            </div>
+          </div>` : ""}
+
+          <!-- ── WhatsApp quick actions ── -->
+          ${phone ? `
+          <div style="padding:10px 16px;border-top:1px solid #f3f4f6;display:flex;gap:8px;flex-wrap:wrap;">
+            <div class="section-lbl" style="width:100%;margin-bottom:2px;">WhatsApp</div>
+            ${isCod ? `<a class="btn secondary" style="padding:7px 12px;font-size:12px;" href="${safeHref(waLink(phone, confirmMsg))}" target="_blank" rel="noopener noreferrer">✅ Confirm COD</a>` : ""}
+            ${o.shiprocket_awb ? `<a class="btn secondary" style="padding:7px 12px;font-size:12px;" href="${safeHref(waLink(phone, shippedMsg))}" target="_blank" rel="noopener noreferrer">🚚 Share tracking</a>` : ""}
+            ${isOnline && canRegen ? `<a class="btn secondary" style="padding:7px 12px;font-size:12px;" href="${safeHref(waLink(phone, reminderMsg))}" target="_blank" rel="noopener noreferrer">🔔 Payment reminder</a>` : ""}
+            <a class="btn secondary" data-wa-invoice href="#" style="padding:7px 12px;font-size:12px;opacity:.5;" data-phone="${escapeAttr(phone)}" data-id="${escapeAttr(o.id)}">📄 Send invoice</a>
+          </div>` : ""}
+
         </div>
       `;
     }
 
-    // ── Load orders ──────────────────────────────────────────────────────────
+    // ── Load orders ───────────────────────────────────────────────────────
     async function load() {
       statusMsg.textContent = "Loading…";
       list.innerHTML = "";
@@ -304,12 +387,9 @@
       const method = document.getElementById("methodFilter").value;
       const q      = document.getElementById("search").value.trim();
 
-      let params = "";
-      if (st)     params += `&status=${encodeURIComponent(st)}`;
-      if (q)      params += `&q=${encodeURIComponent(q)}`;
-      const url = `admin-orders?dummy=1${params}`;
-
-      const { data, error } = await supabase.functions.invoke(url.replace("?dummy=1",""));
+      const { data, error } = await supabase.functions.invoke("admin-orders", {
+        body: { status: st || null, q: q || null }
+      });
 
       if (error) {
         statusMsg.textContent = "Error / Access denied: " + error.message;
@@ -317,22 +397,47 @@
       }
 
       let orders = data.orders || [];
-
-      // Client-side filter by payment method (admin-orders function doesn't support it yet)
       if (method) orders = orders.filter(o => (o.payment_method || "razorpay") === method);
 
       statusMsg.textContent = orders.length
-        ? `Showing ${orders.length} order${orders.length > 1 ? "s" : ""}`
+        ? `Showing ${orders.length} order${orders.length !== 1 ? "s" : ""}`
         : "No orders found.";
 
       list.innerHTML = orders.map(renderOrder).join("");
       wireEvents();
     }
 
-    // ── Wire all button events ────────────────────────────────────────────────
+    // ── Secure status update via edge function ────────────────────────────
+    async function updateStatus(orderId, newStatus, extra = {}) {
+      const { data, error } = await supabase.functions.invoke("admin-update-order-status", {
+        body: { order_id: orderId, status: newStatus, ...extra }
+      });
+      if (error) throw new Error(error.message);
+      return data;
+    }
+
+    // ── Wire all action buttons ───────────────────────────────────────────
     function wireEvents() {
 
-      // Mark shipped — saves AWB + changes status to "shipped"
+      // ── Confirm COD (cod_pending → confirmed) ─────────────────────────
+      list.querySelectorAll("button[data-action='confirm-cod']").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const id = btn.dataset.id;
+          btn.disabled = true;
+          btn.textContent = "Confirming…";
+          try {
+            await updateStatus(id, "confirmed");
+            toast("COD order confirmed ✅ — Customer's order page updated", "#166534");
+            load();
+          } catch (e) {
+            toast("Error: " + e.message, "#dc2626");
+            btn.disabled = false;
+            btn.textContent = "✅ Confirm COD order";
+          }
+        });
+      });
+
+      // ── Mark shipped ──────────────────────────────────────────────────
       list.querySelectorAll("button[data-action='ship']").forEach(btn => {
         btn.addEventListener("click", async () => {
           const id      = btn.dataset.id;
@@ -342,97 +447,69 @@
 
           if (!awb) { toast("Please enter the AWB number first", "#dc2626"); return; }
 
-          btn.disabled = true;
+          btn.disabled    = true;
           btn.textContent = "Saving…";
-
-          const { error } = await supabase
-            .from("orders")
-            .update({
-              status: "shipped",
-              shiprocket_awb: awb,
-              updated_at: new Date().toISOString()
-            })
-            .eq("id", id);
-
-          if (error) {
-            toast("Error: " + error.message, "#dc2626");
-            btn.disabled = false;
+          try {
+            await updateStatus(id, "shipped", { shiprocket_awb: awb });
+            toast("Order marked as shipped 🚚 — Customer can now track it", "#166534");
+            load();
+          } catch (e) {
+            toast("Error: " + e.message, "#dc2626");
+            btn.disabled    = false;
             btn.textContent = "Mark shipped →";
-            return;
           }
-
-          // Log event
-          await supabase.from("order_events").insert({
-            order_id: id,
-            event_type: "order_shipped",
-            payload: { shiprocket_awb: awb, set_by: "admin" }
-          });
-
-          toast("Order marked as shipped ✅", "#166534");
-          load();
         });
       });
 
-      // Update status (delivered / cancelled)
-      list.querySelectorAll("button[data-action='status']").forEach(btn => {
+      // ── Generic status update (delivered / cancelled) ─────────────────
+      list.querySelectorAll("button[data-action='update-status']").forEach(btn => {
         btn.addEventListener("click", async () => {
           const id        = btn.dataset.id;
           const newStatus = btn.dataset.status;
-          if (!confirm(`Mark order ${id.slice(0,8).toUpperCase()} as "${newStatus}"?`)) return;
+          const label     = newStatus === "cancelled" ? "Cancel" : `Mark as "${newStatus}"`;
+
+          if (!confirm(`${label} order ${id.slice(0,8).toUpperCase()}?\n\nThis will update the customer's orders page immediately.`)) return;
 
           btn.disabled = true;
-          const { error } = await supabase
-            .from("orders")
-            .update({ status: newStatus, updated_at: new Date().toISOString() })
-            .eq("id", id);
-
-          if (error) { toast("Error: " + error.message, "#dc2626"); btn.disabled = false; return; }
-
-          await supabase.from("order_events").insert({
-            order_id: id,
-            event_type: `order_status_set:${newStatus}`,
-            payload: { set_by: "admin" }
-          });
-
-          toast(`Order marked as ${newStatus} ✅`, "#166534");
-          load();
+          try {
+            await updateStatus(id, newStatus);
+            toast(`Order ${newStatus} ✅ — Customer order page updated`, "#166534");
+            load();
+          } catch (e) {
+            toast("Error: " + e.message, "#dc2626");
+            btn.disabled = false;
+          }
         });
       });
 
-      // Regenerate Razorpay payment link
+      // ── Regenerate Razorpay payment link ──────────────────────────────
       list.querySelectorAll("button[data-action='regen']").forEach(btn => {
         btn.addEventListener("click", async () => {
           const id = btn.dataset.id;
-          btn.disabled = true;
+          btn.disabled    = true;
           btn.textContent = "Working…";
-
           const { data: r, error } = await supabase.functions.invoke("admin-regenerate-payment-link", {
             body: { order_id: id }
           });
-
-          btn.disabled = false;
+          btn.disabled    = false;
           btn.textContent = "Regenerate link";
-
           if (error) { toast("Error: " + error.message, "#dc2626"); return; }
           toast("New payment link created ✅", "#166534");
           load();
         });
       });
 
-      // Generate invoice PDF
+      // ── Generate invoice ──────────────────────────────────────────────
       list.querySelectorAll("button[data-action='invoice']").forEach(btn => {
         btn.addEventListener("click", async () => {
           const id = btn.dataset.id;
-          btn.disabled = true;
+          btn.disabled    = true;
           btn.textContent = "Generating…";
-
           const { data: inv, error } = await supabase.functions.invoke("admin-generate-invoice", {
             body: { order_id: id }
           });
-
-          btn.disabled = false;
+          btn.disabled    = false;
           btn.textContent = "Generate invoice";
-
           if (error) { toast("Invoice error: " + error.message, "#dc2626"); return; }
 
           const invUrl = safeUrl(inv.invoice_url, { type: "href" });
@@ -441,14 +518,13 @@
           const w = window.open(invUrl, "_blank", "noopener,noreferrer");
           if (w) w.opener = null;
 
-          // Activate "Send invoice" WhatsApp button for this order
-          const card   = list.querySelector(`[data-order-id="${id}"]`);
-          const waBtn  = card?.querySelector("a[data-wa-invoice]");
+          // Activate WhatsApp "Send invoice" button
+          const card  = list.querySelector(`[data-order-id="${id}"]`);
+          const waBtn = card?.querySelector("a[data-wa-invoice]");
           if (waBtn) {
             const phone = waBtn.dataset.phone;
-            const msg   = `Hi, your AhamStree order invoice is ready: ${inv.invoice_url}`;
+            const msg   = `Hi, your AhamStree invoice is ready: ${inv.invoice_url}`;
             waBtn.href  = `https://wa.me/${phone.replace(/\D/g,"")}?text=${encodeURIComponent(msg)}`;
-            waBtn.removeAttribute("aria-disabled");
             waBtn.style.opacity = "1";
           }
 
@@ -457,10 +533,17 @@
       });
     }
 
-    // ── Init ─────────────────────────────────────────────────────────────────
-    document.getElementById("btnLoad").onclick = load;
-    document.getElementById("statusFilter").onchange = load;
-    document.getElementById("methodFilter").onchange = load;
+    // ── Init ──────────────────────────────────────────────────────────────
+    document.getElementById("btnLoad").onclick          = load;
+    document.getElementById("statusFilter").onchange   = load;
+    document.getElementById("methodFilter").onchange   = load;
+
+    // Support pre-filtered URL e.g. admin-orders.html?status=cod_pending
+    const urlStatus = new URLSearchParams(window.location.search).get("status");
+    if (urlStatus) {
+      const sel = document.getElementById("statusFilter");
+      if ([...sel.options].some(o => o.value === urlStatus)) sel.value = urlStatus;
+    }
 
     load();
   </script>
