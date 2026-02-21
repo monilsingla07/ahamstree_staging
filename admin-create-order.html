@@ -383,31 +383,20 @@
     document.getElementById("footer").innerHTML = renderFooter();
     hydrateHeaderAuth();
 
-    const loadingState = document.getElementById("loadingState");
-    const mainContent  = document.getElementById("mainContent");
+    var loadingState = document.getElementById("loadingState");
+    var mainContent  = document.getElementById("mainContent");
 
-    // ── Auth + admin gate ─────────────────────────────────────────────────
-    const { data: sess } = await supabase.auth.getSession();
-    if (!sess?.session) { window.location.href = "login.html"; throw new Error("redirect"); }
-
-    const { data: adminRow } = await supabase
-      .from("admin_users")
-      .select("email")
-      .eq("email", sess.session.user.email?.toLowerCase())
-      .maybeSingle();
-
-    if (!adminRow) {
-      loadingState.innerHTML = `
-        <div style="min-height:50vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;">
-          <div style="font-size:48px;">🔒</div>
-          <h3 style="margin:0;">Access Denied</h3>
-          <a class="btn secondary" href="index.html">Go to store</a>
-        </div>`;
-      return;
+    function showAdminError(emoji, title, message) {
+      loadingState.style.display = "block";
+      mainContent.style.display = "none";
+      loadingState.innerHTML =
+        '<div style="min-height:50vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;">' +
+          '<div style="font-size:48px;">' + emoji + '</div>' +
+          '<h3 style="margin:0;">' + title + '</h3>' +
+          '<div class="small" style="opacity:.7;">' + message + '</div>' +
+          '<a class="btn secondary" href="index.html" style="margin-top:8px;">Go to store</a>' +
+        '</div>';
     }
-
-    loadingState.style.display = "none";
-    mainContent.style.display  = "block";
 
     // ── State ─────────────────────────────────────────────────────────────
     const cart = [];   // { product_id, title, qty, unit_price, price_override }
@@ -801,7 +790,32 @@
     }
 
     // Init
-    renderCart();
+    async function initAdmin() {
+      try {
+        var sessResult = await supabase.auth.getSession();
+        if (sessResult.error) { showAdminError("⚠️", "Auth Error", sessResult.error.message); return; }
+        if (!sessResult.data || !sessResult.data.session) { window.location.href = "login.html"; return; }
+        var session = sessResult.data.session;
+
+        var adminResult = await supabase
+          .from("admin_users")
+          .select("email")
+          .eq("email", session.user.email.toLowerCase())
+          .maybeSingle();
+
+        if (adminResult.error) { showAdminError("⚠️", "Access Check Failed", "Could not verify admin status: " + adminResult.error.message); return; }
+        if (!adminResult.data) { showAdminError("🔒", "Access Denied", "Your account does not have admin access."); return; }
+
+        loadingState.style.display = "none";
+        mainContent.style.display  = "block";
+        renderCart();
+      } catch (e) {
+        console.error("Admin page error:", e);
+        showAdminError("⚠️", "Something went wrong", e.message || "An unexpected error occurred.");
+      }
+    }
+
+    initAdmin();
   </script>
 </body>
 </html>
