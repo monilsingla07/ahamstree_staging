@@ -120,7 +120,7 @@
 
   <script type="module">
     import { renderHeader, renderFooter, hydrateHeaderAuth } from "./assets/ui.js";
-    import { supabase } from "./assets/supabase.js";
+    import { supabase, SUPABASE_ANON_KEY } from "./assets/supabase.js";
     import { escapeHtml, escapeAttr, safeHref, safeUrl } from "./assets/safe.js";
 
     document.getElementById("header").innerHTML = renderHeader("admin");
@@ -408,7 +408,7 @@
           headers: {
             "Content-Type": "application/json",
             "Authorization": "Bearer " + accessToken,
-            "apikey": accessToken
+            "apikey": SUPABASE_ANON_KEY
           },
           body: JSON.stringify({ status: st || null, q: q || null })
         });
@@ -441,7 +441,7 @@
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer " + _tok2,
-          "apikey": _tok2
+          "apikey": SUPABASE_ANON_KEY
         },
         body: JSON.stringify({ order_id: orderId, status: newStatus, ...extra })
       });
@@ -529,7 +529,7 @@
             headers: {
               "Content-Type": "application/json",
               "Authorization": "Bearer " + _tok3,
-              "apikey": _tok3
+              "apikey": SUPABASE_ANON_KEY
             },
             body: JSON.stringify({ order_id: id })
           });
@@ -555,7 +555,7 @@
             headers: {
               "Content-Type": "application/json",
               "Authorization": "Bearer " + _tok4,
-              "apikey": _tok4
+              "apikey": SUPABASE_ANON_KEY
             },
             body: JSON.stringify({ order_id: id })
           });
