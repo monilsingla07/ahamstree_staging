@@ -573,10 +573,58 @@
       };
     };
 
-    // ---------- Init ----------
+// ---------- Init ----------
     statusEl.textContent = "";
     localStorage.removeItem("ahamstree_coupon");
     appliedCoupon = "";
+
+    // ── Pending payment detection (browser back button scenario) ─────────
+    // If the user went to Razorpay and hit back, we already have an order in DB.
+    // Show a banner so they can resume that payment link instead of creating a new order.
+    (function checkPendingPayment() {
+      try {
+        const raw = localStorage.getItem("ahamstree_pending_payment");
+        if (!raw) return;
+        const pending = JSON.parse(raw);
+        if (!pending?.order_id || !pending?.payment_link_url) return;
+
+        // Show the banner only if the stored link is less than 20 minutes old
+        const ageMs = Date.now() - (pending.stored_at || 0);
+        if (ageMs > 20 * 60 * 1000) {
+          localStorage.removeItem("ahamstree_pending_payment");
+          return;
+        }
+
+        // Inject a resume banner above the form
+        const banner = document.createElement("div");
+        banner.id = "pendingPaymentBanner";
+        banner.style.cssText = "margin-bottom:14px;padding:14px 16px;border-radius:16px;border:1.5px solid var(--brand);background:var(--brand-light);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;";
+        banner.innerHTML = `
+          <div>
+            <div style="font-weight:800;font-size:14px;">⚡ You have an incomplete payment</div>
+            <div class="small" style="margin-top:4px;opacity:.8;">Order #${pending.order_id.slice(-8).toUpperCase()} is waiting. Resume your Razorpay session instead of starting over.</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-shrink:0;">
+            <button type="button" id="resumePayBtn" class="btn" style="padding:8px 14px;font-size:13px;">Resume payment</button>
+            <button type="button" id="dismissPendingBtn" class="btn secondary" style="padding:8px 14px;font-size:13px;">Start fresh</button>
+          </div>`;
+
+        // Insert before the checkout grid
+        const grid = document.querySelector(".checkout-grid");
+        if (grid) grid.parentNode.insertBefore(banner, grid);
+
+        document.getElementById("resumePayBtn")?.addEventListener("click", () => {
+          window.location.href = pending.payment_link_url;
+        });
+
+        document.getElementById("dismissPendingBtn")?.addEventListener("click", () => {
+          localStorage.removeItem("ahamstree_pending_payment");
+          banner.remove();
+        });
+      } catch (_) {
+        localStorage.removeItem("ahamstree_pending_payment");
+      }
+    })();
 
     // ---------- Coupon UI ----------
     const AVAILABLE_COUPONS = [
@@ -786,7 +834,19 @@
           if (error)                    { showError(error.message || "Payment setup failed."); return; }
           if (!data?.payment_link_url)  { showError(data?.error   || "Payment setup failed."); return; }
 
-          statusEl.textContent = "Redirecting to Razorpay…";
+statusEl.textContent = "Redirecting to Razorpay…";
+
+          // Save pending payment so the back-button scenario can detect it
+          try {
+            localStorage.setItem("ahamstree_pending_payment", JSON.stringify({
+              order_id:         data.order_id,
+              payment_link_id:  data.payment_link_id,
+              payment_link_url: data.payment_link_url,
+              expires_at:       data.expires_at,
+              stored_at:        Date.now(),
+            }));
+          } catch (_) {}
+
           window.location.href = data.payment_link_url;
 
         // ── Cash on Delivery ────────────────────────────────────────────────
@@ -838,3 +898,4 @@
 
 </body>
 </html>
+
