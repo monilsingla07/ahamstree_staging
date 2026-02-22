@@ -727,9 +727,13 @@
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <a class="btn secondary" href="admin-orders.html?status=cod_pending" style="padding:8px 14px; font-size:13px;">View COD orders →</a>
               <button class="btn secondary" id="newOrderBtn" style="padding:8px 14px; font-size:13px;">Create another order</button>
+              <button class="btn secondary" id="invoiceBtn" style="padding:8px 14px; font-size:13px;">📄 Generate Invoice</button>
             </div>`;
           result.style.display = "block";
           document.getElementById("newOrderBtn")?.addEventListener("click", resetForm);
+          document.getElementById("invoiceBtn")?.addEventListener("click", function() {
+            generateInvoice(data.order_id, this);
+          });
           toast("COD order placed! ✅", "#166534");
 
         } else {
@@ -755,6 +759,7 @@
               </a>
               <button class="btn secondary" id="copyLinkBtn" style="padding:8px 14px; font-size:13px;">Copy link</button>
               <button class="btn secondary" id="newOrderBtn2" style="padding:8px 14px; font-size:13px;">Create another</button>
+              <button class="btn secondary" id="invoiceBtn2" style="padding:8px 14px; font-size:13px;">📄 Generate Invoice</button>
             </div>`;
           result.style.display = "block";
 
@@ -762,6 +767,9 @@
             navigator.clipboard.writeText(link).then(() => toast("Link copied! ✅", "#166534"));
           });
           document.getElementById("newOrderBtn2")?.addEventListener("click", resetForm);
+          document.getElementById("invoiceBtn2")?.addEventListener("click", function() {
+            generateInvoice(data.order_id, this);
+          });
           toast("Payment link generated! Share it via WhatsApp ✅", "#166534");
         }
 
@@ -777,6 +785,42 @@
         submitBtn.disabled = false;
       }
     });
+
+
+    // ── Generate invoice for a just-created order ────────────────────────
+    async function generateInvoice(orderId, btn) {
+      if (!orderId) { toast("No order ID — cannot generate invoice", "#dc2626"); return; }
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Generating…";
+      try {
+        const { data: _sessI } = await supabase.auth.getSession();
+        const _tokI = _sessI?.session?.access_token || "";
+        const _respI = await fetch("https://mgmgkwoxirvzdnmayhwq.supabase.co/functions/v1/admin-generate-invoice", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + _tokI,
+            "apikey": _tokI
+          },
+          body: JSON.stringify({ order_id: orderId })
+        });
+        const inv = await _respI.json();
+        if (!_respI.ok) { toast("Invoice error: " + (inv.error || "HTTP " + _respI.status), "#dc2626"); return; }
+        const invUrl = inv.invoice_url;
+        if (!invUrl) { toast("Invalid invoice URL", "#dc2626"); return; }
+        const w = window.open(invUrl, "_blank", "noopener,noreferrer");
+        if (w) w.opener = null;
+        btn.textContent = "Open Invoice ↗";
+        btn.onclick = function() { const w2 = window.open(invUrl, "_blank", "noopener,noreferrer"); if (w2) w2.opener = null; };
+        toast("Invoice generated ✅  — " + (inv.invoice_number || ""), "#166534");
+      } catch (e) {
+        toast("Invoice error: " + e.message, "#dc2626");
+        btn.textContent = originalText;
+      } finally {
+        btn.disabled = false;
+      }
+    }
 
     // ── Reset form for next order ─────────────────────────────────────────
     function resetForm() {
