@@ -778,7 +778,95 @@
     pmRazorpay?.addEventListener("change", updatePaymentUI);
     pmCod?.addEventListener("change", updatePaymentUI);
     updatePaymentUI();
+// ── Resume checkout banner ────────────────────────────────────────────────
+    // Shown when the edge fn returns an existing pending order (back-button scenario).
+    // Replaces the pay button area with a countdown + redirect.
+    function showResumeCheckoutBanner({ orderId, paymentLinkUrl, expiresAt, msRemaining, totalInr }) {
+      // Remove any existing banner
+      document.getElementById("resumeCheckoutBanner")?.remove();
 
+      const money = (n) => "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
+      const shortId = (orderId || "").slice(-8).toUpperCase();
+
+      const banner = document.createElement("div");
+      banner.id = "resumeCheckoutBanner";
+      banner.style.cssText = [
+        "margin-top:16px;padding:16px;border-radius:16px;",
+        "border:2px solid var(--brand);background:var(--brand-light);",
+        "display:flex;flex-direction:column;gap:12px;"
+      ].join("");
+
+      banner.innerHTML = `
+        <div>
+          <div style="font-weight:900;font-size:15px;margin-bottom:4px;">⚡ You have a pending payment</div>
+          <div class="small" style="opacity:.8;">
+            Order #${shortId} for ${money(totalInr)} was already created and stock is reserved for you.
+            Complete payment before the timer runs out, or the items will be released back.
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div>
+            <div class="small" style="opacity:.7;margin-bottom:2px;">Time remaining to complete payment:</div>
+            <div id="resumeCountdown" style="font-size:22px;font-weight:900;color:var(--brand);letter-spacing:1px;">--:--</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <a id="resumeToOrdersBtn" href="orders.html" class="btn secondary" style="padding:10px 16px;font-size:14px;">
+              View in My Orders
+            </a>
+            <a id="resumePayDirectBtn" href="${paymentLinkUrl}" class="btn" style="padding:10px 16px;font-size:14px;">
+              Complete payment →
+            </a>
+          </div>
+        </div>
+        <div class="small" style="opacity:.65;">
+          Prefer to start fresh? Wait for the timer to expire, then return to checkout.
+        </div>
+      `;
+
+      // Insert after the pay button
+      payBtn.parentNode.insertBefore(banner, payBtn.nextSibling);
+
+      // Hide the pay button while the banner is showing
+      payBtn.style.display = "none";
+      statusEl.textContent = "";
+
+      // Save to localStorage so the orders page and success page can also use it
+      try {
+        localStorage.setItem("ahamstree_pending_payment", JSON.stringify({
+          order_id:         orderId,
+          payment_link_url: paymentLinkUrl,
+          expires_at:       expiresAt,
+          stored_at:        Date.now(),
+        }));
+      } catch (_) {}
+
+      // Countdown timer
+      const countdownEl = document.getElementById("resumeCountdown");
+      const endTime = expiresAt ? new Date(expiresAt).getTime() : (Date.now() + (msRemaining || 0));
+
+      function tick() {
+        const remaining = endTime - Date.now();
+        if (remaining <= 0) {
+          if (countdownEl) countdownEl.textContent = "Expired";
+          // Remove banner and show the pay button again
+          banner.remove();
+          payBtn.style.display = "";
+          try { localStorage.removeItem("ahamstree_pending_payment"); } catch (_) {}
+          clearError();
+          showError("Your reservation has expired. You can now start a fresh checkout.");
+          return;
+        }
+        const mins = Math.floor(remaining / 60000);
+        const secs = Math.floor((remaining % 60000) / 1000);
+        if (countdownEl) {
+          countdownEl.textContent = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+          // Turn red in last 2 minutes
+          countdownEl.style.color = remaining < 120000 ? "crimson" : "var(--brand)";
+        }
+        setTimeout(tick, 1000);
+      }
+      tick();
+    }
     // ---------- Pay / Place Order ----------
     let isProcessing = false;
 
@@ -808,11 +896,17 @@
         const payloadCart = cart.map(i => ({ product_id: i.product_id, qty: i.qty }));
 
         // ── Razorpay (online payment) ────────────────────────────────────────
+        // ── Razorpay (online payment) ────────────────────────────────────────
         if (method === "razorpay") {
-          // ✅ FIX: Razorpay now works for both guests and logged-in users.
-          //    Removed the hard block: if (!token) { showError("Please log in"); return; }
-          //    supabase.functions.invoke() handles auth automatically.
-          payBtn.textContent  = "Processing…";
+          // Online payment requires login — our schema has orders.user_id NOT NULL.
+          // COD is still available to guests.
+          if (!userId) {
+            showError("Please log in to pay online. You can still place a Cash on Delivery order without an account.");
+            updatePaymentUI();
+            return;
+          }
+
+          payBtn.textContent   = "Processing…";
           statusEl.textContent = "Creating payment link…";
 
           const razorBody = {
@@ -824,19 +918,43 @@
             shipping_address: shipping,
             shipping_inr:     0,
           };
-          if (userId) razorBody.user_id = userId; // optional; edge fn can read from JWT too
 
-          // ✅ FIX: No manual Authorization header — client attaches it automatically.
           const { data, error } = await sbMod.supabase.functions.invoke("create-payment-link", {
             body: razorBody
           });
 
-          if (error)                    { showError(error.message || "Payment setup failed."); return; }
-          if (!data?.payment_link_url)  { showError(data?.error   || "Payment setup failed."); return; }
+          // The edge fn returns error.message on 4xx/5xx
+          if (error) {
+            // Surface the structured message from the edge fn if available
+            const msg = error?.context?.json?.message || error?.context?.json?.error || error.message || "Payment setup failed.";
+            showError(msg);
+            return;
+          }
 
-statusEl.textContent = "Redirecting to Razorpay…";
+          if (!data?.payment_link_url) {
+            showError(data?.error || "Payment setup failed.");
+            return;
+          }
 
-          // Save pending payment so the back-button scenario can detect it
+          // ── Resumed existing order ────────────────────────────────────────
+          // Edge fn found a pending order for the same items within the TTL window.
+          // Show a resume banner with a countdown instead of creating a new order.
+          if (data.resumed) {
+            statusEl.textContent = "";
+            showResumeCheckoutBanner({
+              orderId:        data.order_id,
+              paymentLinkUrl: data.payment_link_url,
+              expiresAt:      data.expires_at,
+              msRemaining:    data.ms_remaining,
+              totalInr:       data.total_inr,
+            });
+            return;
+          }
+
+          // ── New order — redirect immediately ─────────────────────────────
+          statusEl.textContent = "Redirecting to Razorpay…";
+
+          // Persist so checkout.html can detect the back-button scenario
           try {
             localStorage.setItem("ahamstree_pending_payment", JSON.stringify({
               order_id:         data.order_id,
@@ -848,7 +966,6 @@ statusEl.textContent = "Redirecting to Razorpay…";
           } catch (_) {}
 
           window.location.href = data.payment_link_url;
-
         // ── Cash on Delivery ────────────────────────────────────────────────
         } else {
           payBtn.textContent  = "Placing order…";
@@ -898,4 +1015,5 @@ statusEl.textContent = "Redirecting to Razorpay…";
 
 </body>
 </html>
+
 
