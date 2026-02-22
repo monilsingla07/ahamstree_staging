@@ -129,7 +129,7 @@
       </div>
 
       <div id="bestsellersStatus" class="small" style="margin-bottom:10px;"></div>
-      <div id="bestsellersGrid" class="grid grid-3"></div>
+      <div id="bestsellersGrid" class="grid grid-4"></div>
     </section>
 
     <!-- New Collection -->
@@ -140,7 +140,7 @@
       </div>
 
       <div id="newCollectionStatus" class="small" style="margin-bottom:10px;"></div>
-      <div id="newCollectionGrid" class="grid grid-3"></div>
+      <div id="newCollectionGrid" class="grid grid-4"></div>
     </section>
 
 
@@ -150,7 +150,7 @@
         <h2 class="section-title">Loved by customers across India</h2>
       </div>
 
-      <div id="testimonialsGrid" class="grid grid-3"></div>
+      <div id="testimonialsGrid" class="t-compact-grid"></div>
     </section>
 
 
@@ -191,30 +191,23 @@ const testimonials = [
 
     const tGrid = document.getElementById("testimonialsGrid");
     if (tGrid) {
-     tGrid.innerHTML = testimonials.map(t => `
-  <div class="card testimonial-card t-card">
-
-    <div class="t-photo-wrap">
-      <img class="t-photo"
-           src="${t.img}"
-           alt="${t.name}"
-           loading="lazy"
-           onerror="this.style.display='none'">
-      <div class="t-quote-icon" aria-hidden="true">❝</div>
-    </div>
-
-    <div class="t-head">
-      <div class="t-person">
-        <div class="t-name">${t.name}</div>
-        <div class="t-place small">${t.place}</div>
-      </div>
-      <div class="t-stars small" aria-label="${t.stars} stars">${stars(t.stars)}</div>
-    </div>
-
-    <div class="t-quote">“${t.quote}”</div>
-  </div>
-`).join("");
- }
+      tGrid.innerHTML = testimonials.map(t => `
+        <div class="card t-compact-card">
+          <div class="t-compact-stars">${stars(t.stars)}</div>
+          <div class="t-compact-quote">"${t.quote}"</div>
+          <div class="t-compact-foot">
+            <div class="t-compact-avatar">
+              <img src="${t.img}" alt="${t.name}" loading="lazy"
+                   onerror="this.style.display='none';this.parentElement.dataset.initial='${t.name.charAt(0)}'">
+            </div>
+            <div>
+              <div class="t-compact-name">${t.name}</div>
+              <div class="t-compact-place">${t.place}</div>
+            </div>
+          </div>
+        </div>
+      `).join("");
+    }
 
 
 
