@@ -376,7 +376,7 @@
 
   <script type="module">
     import { renderHeader, renderFooter, hydrateHeaderAuth } from "./assets/ui.js";
-    import { supabase } from "./assets/supabase.js";
+    import { supabase, SUPABASE_ANON_KEY } from "./assets/supabase.js";
     import { escapeHtml, escapeAttr, safeHref } from "./assets/safe.js";
 
     document.getElementById("header").innerHTML = renderHeader("admin");
@@ -703,7 +703,7 @@
           headers: {
             "Content-Type": "application/json",
             "Authorization": "Bearer " + _tokC,
-            "apikey": _tokC
+            "apikey": SUPABASE_ANON_KEY
           },
           body: JSON.stringify(payload)
         });
@@ -801,7 +801,7 @@
           headers: {
             "Content-Type": "application/json",
             "Authorization": "Bearer " + _tokI,
-            "apikey": _tokI
+            "apikey": SUPABASE_ANON_KEY
           },
           body: JSON.stringify({ order_id: orderId })
         });
