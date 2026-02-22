@@ -182,12 +182,12 @@ export async function hydrateHome() {
     setStatus("newCollectionStatus", "Loading…");
 
     // Most loved
-    const mostLoved = await fetchMostLoved(6);
+    const mostLoved = await fetchMostLoved(8);
     renderGrid("bestsellersGrid", mostLoved);
     setStatus("bestsellersStatus", "");
 
     // New Collection (latest arrivals)
-    const latest = await fetchLatestActive(6);
+    const latest = await fetchLatestActive(8);
     renderGrid("newCollectionGrid", latest);
     setStatus("newCollectionStatus", "");
 
