@@ -17,6 +17,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/styles.css" />
   <style>
+    /* ── Status badges ──────────────────────────────────────────────────── */
     .status-badge {
       display: inline-flex; align-items: center; gap: 5px;
       padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 800;
@@ -28,6 +29,7 @@
     .status-badge.pending   { background: #fef9c3; color: #854d0e; }
     .status-badge.failed    { background: #fee2e2; color: #991b1b; }
     .status-badge.cancelled { background: #f3f4f6; color: #6b7280; }
+
     .payment-pill {
       display: inline-flex; align-items: center; gap: 4px;
       padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700;
@@ -36,12 +38,85 @@
     .payment-pill.cod    { background: #fff7ed; color: #9a3412; }
     .payment-pill.online { background: #eff6ff; color: #1d4ed8; }
 
-    /* Pulsing border for urgent pending orders */
+    /* ── Pulsing border for urgent pending orders ───────────────────────── */
     @keyframes urgentPulse {
       0%, 100% { border-color: var(--brand); }
       50%       { border-color: crimson; }
     }
     .pending-urgent { animation: urgentPulse 1.5s ease-in-out infinite; }
+
+    /* ── Inline tracker panel ───────────────────────────────────────────── */
+    .tracker-panel {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.38s ease, padding 0.2s ease;
+      padding: 0 16px;
+      background: #f8faff;
+    }
+    .tracker-panel.open {
+      max-height: 900px;
+      padding: 16px;
+      border-top: 1px solid #bfdbfe;
+    }
+
+    /* ── Tracking timeline ──────────────────────────────────────────────── */
+    .tl { display: flex; flex-direction: column; }
+    .tl-row {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 0 12px;
+      position: relative;
+    }
+    .tl-row:not(:last-child) .tl-line {
+      position: absolute;
+      left: 13px; top: 28px; bottom: -4px;
+      width: 2px; background: #cbd5e1;
+    }
+    .tl-dot {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: #e2e8f0; border: 2px solid #cbd5e1;
+      flex-shrink: 0; margin-top: 1px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px;
+    }
+    .tl-dot.latest { background: #1e40af; border-color: #1e40af; color: #fff; }
+    .tl-body { padding-bottom: 18px; }
+    .tl-act   { font-size: 13px; font-weight: 700; line-height: 1.35; color: #1e293b; }
+    .tl-act.dim { color: #64748b; font-weight: 500; }
+    .tl-meta  { font-size: 11px; color: #64748b; margin-top: 2px; }
+
+    /* ── Return modal ───────────────────────────────────────────────────── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45); z-index: 9999;
+      align-items: center; justify-content: center; padding: 16px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: #fff; border-radius: 20px;
+      padding: 24px; max-width: 440px; width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    .modal-box h3 { margin: 0 0 10px; font-size: 18px; }
+
+    /* ── Return reason chips ────────────────────────────────────────────── */
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .chip {
+      padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 700;
+      border: 1.5px solid #e2e8f0; background: #f8fafc; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .chip:hover, .chip.sel {
+      border-color: var(--brand, #7c3aed);
+      background: var(--brand-light, #f5f3ff);
+      color: var(--brand, #7c3aed);
+    }
+
+    /* ── Return status badges ───────────────────────────────────────────── */
+    .status-badge.ret-req  { background: #eff6ff; color: #1e40af; border:1px solid #bfdbfe; }
+    .status-badge.ret-ok   { background: #f0fdf4; color: #14532d; border:1px solid #86efac; }
+    .status-badge.ret-pick { background: #f0fdf4; color: #14532d; }
+    .status-badge.ret-rej  { background: #fee2e2; color: #991b1b; }
   </style>
 </head>
 
@@ -52,7 +127,7 @@
     <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-start;">
       <div>
         <h2 style="margin:0;">My Orders</h2>
-        <div class="small" style="margin-top:6px; opacity:.75;">Your orders and delivery status.</div>
+        <div class="small" style="margin-top:6px; opacity:.75;">Your orders, delivery status &amp; returns.</div>
       </div>
       <div style="display:flex; gap:10px; flex-wrap:wrap;">
         <a class="btn secondary" href="account.html">Account</a>
@@ -64,6 +139,62 @@
 
     <div id="statusMsg" class="small" style="margin-bottom:12px;">Loading…</div>
     <div id="list" style="display:grid; gap:14px;"></div>
+  </div>
+
+  <!-- ═══════════════════ Return modal ═══════════════════════════════════ -->
+  <div class="modal-overlay" id="returnModal">
+    <div class="modal-box">
+      <h3>🔄 Request a Return</h3>
+      <p class="small" style="color:#64748b; margin:0 0 4px;">
+        Returns accepted within <strong>10 days</strong> of delivery.
+        Item must be unused, unwashed, with original tags and packaging.
+      </p>
+
+      <!-- Form body -->
+      <div id="retFormBody">
+        <div style="margin-top:14px;">
+          <div class="small" style="font-weight:700; margin-bottom:8px;">Why are you returning?</div>
+          <div class="chips" id="reasonChips">
+            <div class="chip" data-r="Wrong size / fit issue">Wrong size / fit</div>
+            <div class="chip" data-r="Colour different from images">Colour mismatch</div>
+            <div class="chip" data-r="Damaged / defective product">Damaged / defective</div>
+            <div class="chip" data-r="Not as described">Not as described</div>
+            <div class="chip" data-r="Changed my mind">Changed my mind</div>
+            <div class="chip" data-r="Other">Other</div>
+          </div>
+        </div>
+
+        <div id="otherWrap" style="display:none; margin-top:4px;">
+          <textarea id="otherTxt" class="input" rows="2"
+            placeholder="Please describe your reason…"
+            style="width:100%; font-size:13px; resize:vertical;"></textarea>
+        </div>
+
+        <div style="margin-top:14px; padding:12px; background:#fff7ed; border-radius:12px; border:1px solid #fed7aa;">
+          <div class="small" style="color:#9a3412; font-weight:700; margin-bottom:4px;">⚠️ Please note</div>
+          <div class="small" style="color:#9a3412; line-height:1.5;">
+            Natural variation in colour, weave, or texture is not a defect in handloom sarees.
+            A quality check will be done after receipt before any refund is issued.
+          </div>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
+          <button class="btn" id="retSubmit" type="button">Submit Return Request</button>
+          <button class="btn secondary" id="retCancel" type="button">Cancel</button>
+        </div>
+        <div id="retStatus" class="small" style="margin-top:10px;"></div>
+      </div>
+
+      <!-- Success state -->
+      <div id="retSuccess" style="display:none; text-align:center; padding:16px 0;">
+        <div style="font-size:42px; margin-bottom:10px;">✅</div>
+        <div style="font-weight:900; font-size:16px; margin-bottom:6px;">Return request submitted!</div>
+        <div class="small" style="color:#64748b; max-width:32ch; margin:0 auto 18px;">
+          Our team will review your request and arrange a pickup within 2–3 business days.
+        </div>
+        <button class="btn secondary" id="retSuccessClose" type="button">Close</button>
+      </div>
+    </div>
   </div>
 
   <div id="footer"></div>
@@ -79,10 +210,218 @@
 
     const statusMsg = document.getElementById("statusMsg");
     const list      = document.getElementById("list");
-
-    // Track all active countdown timers so we can clear them on re-render
     const activeTimers = [];
 
+    // ── Payment reservation TTL (keep in sync with backend) ───────────────
+    const RESERVATION_TTL_MS = 10 * 60 * 1000;
+
+    // ══════════════════════════════════════════════════════════════════════
+    // RETURN MODAL
+    // ══════════════════════════════════════════════════════════════════════
+    let retOrderId = null;
+    let retReason  = "";
+
+    const modal         = document.getElementById("returnModal");
+    const retFormBody   = document.getElementById("retFormBody");
+    const retSuccess    = document.getElementById("retSuccess");
+    const retStatus     = document.getElementById("retStatus");
+    const retSubmitBtn  = document.getElementById("retSubmit");
+    const reasonChips   = document.querySelectorAll(".chip[data-r]");
+    const otherWrap     = document.getElementById("otherWrap");
+    const otherTxt      = document.getElementById("otherTxt");
+
+    // Reason chip selection
+    reasonChips.forEach(chip => {
+      chip.addEventListener("click", () => {
+        reasonChips.forEach(c => c.classList.remove("sel"));
+        chip.classList.add("sel");
+        retReason = chip.dataset.r;
+        otherWrap.style.display = retReason === "Other" ? "block" : "none";
+      });
+    });
+
+    function openReturnModal(orderId) {
+      retOrderId = orderId;
+      retReason  = "";
+      reasonChips.forEach(c => c.classList.remove("sel"));
+      otherWrap.style.display   = "none";
+      otherTxt.value            = "";
+      retStatus.textContent     = "";
+      retSubmitBtn.disabled     = false;
+      retFormBody.style.display = "";
+      retSuccess.style.display  = "none";
+      modal.classList.add("open");
+    }
+
+    function closeReturnModal() {
+      modal.classList.remove("open");
+      retOrderId = null;
+    }
+
+    document.getElementById("retCancel").addEventListener("click", closeReturnModal);
+    document.getElementById("retSuccessClose").addEventListener("click", closeReturnModal);
+    modal.addEventListener("click", e => { if (e.target === modal) closeReturnModal(); });
+
+    retSubmitBtn.addEventListener("click", async () => {
+      const reason = retReason === "Other"
+        ? (otherTxt.value.trim() || "Other")
+        : retReason;
+
+      if (!reason) {
+        retStatus.style.color = "crimson";
+        retStatus.textContent = "Please select a reason for your return.";
+        return;
+      }
+
+      retSubmitBtn.disabled = true;
+      retStatus.style.color = "#64748b";
+      retStatus.textContent = "Submitting your return request…";
+
+      try {
+        const { data, error } = await supabase.functions.invoke("shiprocket-return", {
+          body: { order_id: retOrderId, reason }
+        });
+
+        if (error || data?.error) {
+          throw new Error(error?.message || data?.error || "Unknown error");
+        }
+
+        // Save return status to DB (fire-and-forget)
+        supabase.from("orders").update({
+          return_status: "requested",
+          return_reason: reason,
+          return_requested_at: new Date().toISOString(),
+        }).eq("id", retOrderId).then(() => {});
+
+        // Update UI
+        const badge = document.getElementById(`ret-badge-${retOrderId}`);
+        if (badge) badge.innerHTML = retStatusBadge("requested");
+        const btn = document.getElementById(`ret-btn-${retOrderId}`);
+        if (btn) btn.remove();
+
+        retFormBody.style.display = "none";
+        retSuccess.style.display  = "";
+
+      } catch (err) {
+        retSubmitBtn.disabled = false;
+        retStatus.style.color = "crimson";
+        retStatus.textContent = "Could not submit: " + err.message;
+      }
+    });
+
+    // ══════════════════════════════════════════════════════════════════════
+    // INLINE TRACKER
+    // ══════════════════════════════════════════════════════════════════════
+    async function toggleTracker(orderId, awb) {
+      const panel = document.getElementById(`tp-${orderId}`);
+      const btn   = document.getElementById(`tb-${orderId}`);
+      if (!panel || !btn) return;
+
+      const isOpen = panel.classList.contains("open");
+
+      if (isOpen) {
+        panel.classList.remove("open");
+        btn.textContent = "▼ Track order";
+        return;
+      }
+
+      if (panel.dataset.loaded === "1") {
+        panel.classList.add("open");
+        btn.textContent = "▲ Hide tracking";
+        return;
+      }
+
+      // Load for the first time
+      panel.innerHTML = `<div class="small" style="color:#64748b;">Fetching live tracking…</div>`;
+      panel.classList.add("open");
+      btn.textContent = "▲ Hide tracking";
+      btn.disabled = true;
+
+      try {
+        const { data, error } = await supabase.functions.invoke("shiprocket-track", {
+          body: { awb }
+        });
+
+        if (error) throw new Error(error.message);
+
+        const td    = data?.tracking_data;
+        const st    = td?.shipment_track?.[0] || {};
+        const acts  = (td?.shipment_track_activities || [])
+          .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+
+        const safeUrl = (td?.track_url || "").match(/^https?:\/\//)
+          ? td.track_url : "";
+
+        let html = "";
+
+        // Summary row
+        html += `<div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-bottom:12px;">`;
+        if (st.current_status) {
+          html += `<div style="font-weight:900;font-size:14px;color:#1e293b;">
+            📦 ${escapeHtml(st.current_status)}</div>`;
+        }
+        if (st.etd) {
+          html += `<div class="small" style="color:#64748b;">
+            Expected: <strong>${escapeHtml(st.etd)}</strong></div>`;
+        }
+        if (st.courier_name) {
+          html += `<div class="small" style="color:#64748b;">
+            via <strong>${escapeHtml(st.courier_name)}</strong></div>`;
+        }
+        if (safeUrl) {
+          html += `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer"
+            class="small" style="color:var(--brand,#7c3aed);font-weight:700;margin-left:auto;">
+            Carrier tracking →</a>`;
+        }
+        html += `</div>`;
+
+        html += `<div class="small" style="color:#1e40af;margin-bottom:14px;">
+          AWB: <strong>${escapeHtml(awb)}</strong></div>`;
+
+        // Timeline
+        if (acts.length) {
+          html += `<div class="tl">`;
+          acts.forEach((act, i) => {
+            const isLatest = i === 0;
+            html += `
+              <div class="tl-row">
+                <div style="position:relative;">
+                  <div class="tl-dot ${isLatest ? "latest" : ""}">
+                    ${isLatest ? "●" : "·"}
+                  </div>
+                  ${i < acts.length - 1 ? `<div class="tl-line"></div>` : ""}
+                </div>
+                <div class="tl-body">
+                  <div class="tl-act ${isLatest ? "" : "dim"}">
+                    ${escapeHtml(act.activity || act.status || "Update")}
+                  </div>
+                  <div class="tl-meta">
+                    ${act.location ? escapeHtml(act.location) + (act.date ? " · " : "") : ""}
+                    ${act.date ? escapeHtml(act.date) : ""}
+                  </div>
+                </div>
+              </div>`;
+          });
+          html += `</div>`;
+        } else {
+          html += `<div class="small" style="color:#64748b;">
+            No tracking events yet — check back soon.</div>`;
+        }
+
+        panel.innerHTML = html;
+        panel.dataset.loaded = "1";
+
+      } catch (err) {
+        panel.innerHTML = `<div class="small" style="color:crimson;">
+          Could not load tracking: ${escapeHtml(err.message)}</div>`;
+      }
+
+      btn.disabled = false;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // HELPERS
+    // ══════════════════════════════════════════════════════════════════════
     function money(v) {
       return "₹" + Number(v || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
     }
@@ -104,6 +443,18 @@
       return `<span class="status-badge ${s.cls}">${s.label}</span>`;
     }
 
+    function retStatusBadge(rs) {
+      if (!rs) return "";
+      const map = {
+        requested : { label: "↩ Return Requested", cls: "ret-req"  },
+        approved  : { label: "↩ Return Approved",  cls: "ret-ok"   },
+        picked    : { label: "↩ Item Picked Up",    cls: "ret-pick" },
+        rejected  : { label: "↩ Return Rejected",   cls: "ret-rej"  },
+      };
+      const s = map[rs] || { label: "↩ " + rs, cls: "ret-req" };
+      return `<span class="status-badge ${s.cls}">${s.label}</span>`;
+    }
+
     function paymentPill(method) {
       if (method === "cod") return `<span class="payment-pill cod">💵 Cash on Delivery</span>`;
       return `<span class="payment-pill online">💳 Online Payment</span>`;
@@ -117,124 +468,130 @@
       });
     }
 
-    // Determine how much time is left on a payment_link_created order.
-    // IMPORTANT: keep this in sync with your backend (RESERVATION_TTL_MINUTES).
-    // This is used to decide whether to show “Complete payment” or mark the link as expired.
-    const RESERVATION_TTL_MS = 10 * 60 * 1000;
-
-    function getExpiryMs(order) {
-      if (!order.created_at) return 0;
-      return new Date(order.created_at).getTime() + RESERVATION_TTL_MS;
-    }
-
+    // ══════════════════════════════════════════════════════════════════════
+    // RENDER ORDER CARD
+    // ══════════════════════════════════════════════════════════════════════
     function renderOrder(o) {
       const isCod    = o.payment_method === "cod";
       const isOnline = !isCod;
-
-      const payLink     = o.razorpay_payment_link_url;
+      const payLink  = o.razorpay_payment_link_url;
       const safePayHref = safeHref(payLink);
 
-      // Pending online payment (Payment Link created)
-      // We treat it as *expired* on the UI once the reservation TTL has passed,
-      // even if the DB status hasn't yet been updated.
-      const isPendingPayment = isOnline && o.status === "payment_link_created" && !!safePayHref;
-      const expiryMs         = isPendingPayment ? getExpiryMs(o) : 0;
-      const isStillActive    = isPendingPayment && (expiryMs - Date.now() > 0);
-      const effectiveStatus  = (isPendingPayment && !isStillActive) ? "expired" : o.status;
+      const isPendingPay  = isOnline && o.status === "payment_link_created" && !!safePayHref;
+      const expiryMs      = isPendingPay ? new Date(o.created_at).getTime() + RESERVATION_TTL_MS : 0;
+      const isStillActive = isPendingPay && (expiryMs - Date.now() > 0);
+      const effectiveSt   = (isPendingPay && !isStillActive) ? "expired" : o.status;
 
-      // "Retry" for failed/expired links (no countdown — link may still work or
-      // the user can go back to checkout to create a new one)
-      const canRetryFailed = isOnline &&
-        ["payment_link_failed", "failed"].includes(o.status) &&
-        !!safePayHref;
+      const canRetry    = isOnline && ["payment_link_failed", "failed"].includes(o.status) && !!safePayHref;
+      const awb         = o.shiprocket_awb;
+      const canTrack    = !!awb && ["shipped", "delivered"].includes(o.status);
+      const isDelivered = o.status === "delivered";
+      const rs          = o.return_status;
+      const canReturn   = isDelivered && !rs;
 
-      const awb      = o.shiprocket_awb;
-      const canTrack = !!awb && ["shipped", "delivered"].includes(o.status);
+      const shortId   = escapeHtml(o.id.slice(0, 8).toUpperCase());
+      const cardId    = `order-card-${o.id}`;
+      const cdId      = `countdown-${o.id}`;
 
       const items = (o.order_items || [])
         .map(it => `
-          <div style="display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid var(--border-light);">
-            <div class="small" style="flex:1;">${Number(it.qty || 0)} × ${escapeHtml(it.title)}</div>
-            <div class="small" style="font-weight:700; flex-shrink:0;">${money(it.price_inr)}</div>
-          </div>`)
-        .join("");
+          <div style="display:flex;justify-content:space-between;gap:10px;
+                      padding:8px 0;border-bottom:1px solid var(--border-light);">
+            <div class="small" style="flex:1;">${Number(it.qty||0)} × ${escapeHtml(it.title)}</div>
+            <div class="small" style="font-weight:700;flex-shrink:0;">${money(it.price_inr)}</div>
+          </div>`).join("");
 
-      const shortId    = escapeHtml(o.id.slice(0, 8).toUpperCase());
-      const countdownId = `countdown-${o.id}`;
-      const cardId      = `order-card-${o.id}`;
-
-      const discountRow = (Number(o.discount_inr) > 0)
+      const discountRow = Number(o.discount_inr) > 0
         ? `<div style="display:flex;justify-content:space-between;gap:8px;margin-top:4px;">
              <div class="small" style="opacity:.7;">Discount</div>
-             <div class="small" style="color:green; font-weight:700;">−${money(o.discount_inr)}</div>
-           </div>`
-        : "";
+             <div class="small" style="color:green;font-weight:700;">−${money(o.discount_inr)}</div>
+           </div>` : "";
 
-      // ── Pending payment banner (only while still active) ─────────────────
-      const pendingBanner = (isPendingPayment && isStillActive) ? `
-        <div style="padding:14px 16px; background:var(--brand-light); border-top:2px solid var(--brand);">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+      // ── Pending payment banners ─────────────────────────────────────────
+      const pendingBanner = (isPendingPay && isStillActive) ? `
+        <div style="padding:14px 16px;background:var(--brand-light);border-top:2px solid var(--brand);">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
             <div>
-              <div style="font-weight:900; font-size:14px; margin-bottom:4px;">⚡ Payment not completed</div>
-              <div class="small" style="opacity:.8; margin-bottom:8px;">
-                Your items are reserved. Complete payment before the timer runs out.
+              <div style="font-weight:900;font-size:14px;margin-bottom:4px;">⚡ Payment not completed</div>
+              <div class="small" style="opacity:.8;margin-bottom:8px;">
+                Items reserved — complete payment before the timer runs out.
               </div>
-              <div style="display:flex; align-items:center; gap:8px;">
+              <div style="display:flex;align-items:center;gap:8px;">
                 <div class="small" style="opacity:.7;">Time left:</div>
-                <div id="${countdownId}" style="font-size:20px; font-weight:900; color:var(--brand); letter-spacing:1px; min-width:60px;">--:--</div>
+                <div id="${cdId}" style="font-size:20px;font-weight:900;color:var(--brand);
+                  letter-spacing:1px;min-width:60px;">--:--</div>
               </div>
             </div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap; flex-shrink:0;">
-              <a class="btn" href="${safePayHref}" style="padding:10px 18px; font-size:14px;">
-                Complete payment →
-              </a>
-            </div>
+            <a class="btn" href="${safePayHref}" style="padding:10px 18px;font-size:14px;">
+              Complete payment →
+            </a>
           </div>
         </div>` : "";
 
-      // ── Expired payment banner (when TTL is over) ────────────────────────
-      // No pay button here — payment window is over.
-      const expiredBanner = (isPendingPayment && !isStillActive) ? `
-        <div style="padding:14px 16px; background:#fff7ed; border-top:2px solid #f97316;">
-          <div style="font-weight:900; font-size:14px; margin-bottom:4px;">⏱️ Payment window expired</div>
-          <div class="small" style="opacity:.85; margin-bottom:10px;">
-            This payment link is no longer active. Please start checkout again to create a fresh payment link.
+      const expiredBanner = (isPendingPay && !isStillActive) ? `
+        <div style="padding:14px 16px;background:#fff7ed;border-top:2px solid #f97316;">
+          <div style="font-weight:900;font-size:14px;margin-bottom:4px;">⏱️ Payment window expired</div>
+          <div class="small" style="opacity:.85;margin-bottom:10px;">
+            This payment link is no longer active. Start checkout again for a fresh link.
           </div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <a class="btn secondary" href="cart.html" style="padding:10px 18px; font-size:14px;">Go to cart</a>
-            <a class="btn secondary" href="checkout.html" style="padding:10px 18px; font-size:14px;">Go to checkout</a>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <a class="btn secondary" href="cart.html" style="padding:10px 18px;font-size:14px;">Cart</a>
+            <a class="btn secondary" href="checkout.html" style="padding:10px 18px;font-size:14px;">Checkout</a>
           </div>
         </div>` : "";
 
       return `
-        <div class="card" id="${cardId}" style="border-radius:16px; overflow:hidden;${isStillActive ? " border:2px solid var(--brand);" : ""}">
+        <div class="card" id="${cardId}"
+          style="border-radius:16px;overflow:hidden;
+                 ${isStillActive ? "border:2px solid var(--brand);" : ""}">
 
-          <!-- Header row -->
-          <div style="padding:14px 16px; display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; border-bottom:1px solid var(--border-light);">
+          <!-- ── Header ── -->
+          <div style="padding:14px 16px;display:flex;align-items:flex-start;
+                      justify-content:space-between;gap:12px;flex-wrap:wrap;
+                      border-bottom:1px solid var(--border-light);">
             <div>
-              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
-                <span style="font-weight:900; font-size:15px;">Order #${shortId}</span>
-                ${statusBadge(effectiveStatus)}
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+                <span style="font-weight:900;font-size:15px;">Order #${shortId}</span>
+                ${statusBadge(effectiveSt)}
                 ${paymentPill(o.payment_method)}
               </div>
               <div class="small" style="opacity:.65;">${formatDate(o.created_at)}</div>
             </div>
 
-            <!-- Action buttons (non-pending states) -->
-            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-              ${canRetryFailed
-                ? `<a class="btn secondary" style="padding:8px 14px; font-size:13px;"
-                     href="${safePayHref}">
-                     Retry payment →
-                   </a>`
+            <!-- Action buttons -->
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              ${canRetry
+                ? `<a class="btn secondary" style="padding:8px 14px;font-size:13px;"
+                     href="${safePayHref}">Retry payment →</a>`
                 : ""}
               ${canTrack
-                ? `<a class="btn secondary" style="padding:8px 14px; font-size:13px;"
-                     href="track.html?awb=${encodeURIComponent(awb)}">
-                     Track order
-                   </a>`
+                ? `<button id="tb-${o.id}"
+                     class="btn secondary"
+                     style="padding:8px 14px;font-size:13px;"
+                     type="button"
+                     onclick="window.__track('${o.id}','${escapeHtml(awb)}')">
+                     ▼ Track order
+                   </button>`
+                : ""}
+              ${canReturn
+                ? `<button id="ret-btn-${o.id}"
+                     class="btn secondary"
+                     style="padding:8px 14px;font-size:13px;"
+                     type="button"
+                     onclick="window.__return('${o.id}')">
+                     ↩ Return
+                   </button>`
                 : ""}
             </div>
+          </div>
+
+          <!-- Return status strip -->
+          <div id="ret-badge-${o.id}">
+            ${rs
+              ? `<div style="padding:8px 16px;background:#eff6ff;border-bottom:1px solid #bfdbfe;">
+                   ${retStatusBadge(rs)}
+                 </div>`
+              : ""}
           </div>
 
           <!-- Items -->
@@ -243,55 +600,67 @@
           </div>
 
           <!-- Totals -->
-          <div style="padding:12px 16px; border-top:1px solid var(--border-light); background:#fafafa;">
+          <div style="padding:12px 16px;border-top:1px solid var(--border-light);background:#fafafa;">
             ${discountRow}
-            <div style="display:flex; justify-content:space-between; gap:8px; margin-top:4px;">
+            <div style="display:flex;justify-content:space-between;gap:8px;margin-top:4px;">
               <div class="small" style="opacity:.7;">Shipping</div>
               <div class="small">${money(o.shipping_inr)}</div>
             </div>
-            <div style="display:flex; justify-content:space-between; gap:8px; margin-top:8px; font-weight:900;">
+            <div style="display:flex;justify-content:space-between;gap:8px;
+                        margin-top:8px;font-weight:900;">
               <div>Total</div>
               <div>${money(o.total_inr)}</div>
             </div>
           </div>
 
-          <!-- Pending payment banner with countdown -->
           ${pendingBanner}
-
-          <!-- Expired payment banner -->
           ${expiredBanner}
 
-          <!-- COD pending note -->
           ${(isCod && o.status === "confirmed")
-            ? `<div style="padding:10px 16px; background:#fff7ed; border-top:1px solid #fed7aa;">
+            ? `<div style="padding:10px 16px;background:#fff7ed;border-top:1px solid #fed7aa;">
                  <div class="small" style="color:#9a3412;">
                    📦 COD order — our team will contact you to confirm dispatch.
                  </div>
                </div>`
             : ""}
 
-          <!-- Shipping info -->
           ${awb
-            ? `<div style="padding:10px 16px; background:#eff6ff; border-top:1px solid #bfdbfe;">
+            ? `<div style="padding:10px 16px;background:#eff6ff;border-top:1px solid #bfdbfe;">
                  <div class="small" style="color:#1e40af;">
                    🚚 AWB: <strong>${escapeHtml(awb)}</strong>
-                   ${canTrack ? `— <a href="track.html?awb=${encodeURIComponent(awb)}" style="color:inherit;">Track →</a>` : ""}
                  </div>
                </div>`
             : ""}
-        </div>
-      `;
+
+          <!-- Inline tracker (collapsed by default) -->
+          ${canTrack
+            ? `<div class="tracker-panel" id="tp-${o.id}"></div>`
+            : ""}
+
+          <!-- Return eligibility note for newly delivered orders -->
+          ${(isDelivered && !rs)
+            ? `<div style="padding:8px 16px;background:#f8fafc;border-top:1px solid var(--border-light);">
+                 <div class="small" style="color:#64748b;">
+                   Returns accepted within 10 days of delivery ·
+                   <a href="returns.html" style="color:var(--brand,#7c3aed);font-weight:600;">
+                     Return policy →</a>
+                 </div>
+               </div>`
+            : ""}
+        </div>`;
     }
 
-    // ── Start countdown timers after HTML is rendered ────────────────────────
+    // ── Expose handlers as globals so onclick attrs can reach them ──────────
+    window.__track  = (oid, awb) => toggleTracker(oid, awb);
+    window.__return = (oid)      => openReturnModal(oid);
+
+    // ── Countdown timers ────────────────────────────────────────────────────
     function startCountdowns(orders) {
-      // Clear any previous timers
       activeTimers.forEach(clearInterval);
       activeTimers.length = 0;
 
       orders.forEach(o => {
         if (o.status !== "payment_link_created" || !o.razorpay_payment_link_url) return;
-
         const el = document.getElementById(`countdown-${o.id}`);
         if (!el) return;
 
@@ -299,22 +668,15 @@
 
         function tick() {
           const remaining = expiryMs - Date.now();
-
           if (remaining <= 0) {
-            el.textContent = "Expired";
-            el.style.color = "#6b7280";
-            // Dim the card — reservation has released
+            el.textContent = "Expired"; el.style.color = "#6b7280";
             const card = document.getElementById(`order-card-${o.id}`);
             if (card) card.style.borderColor = "var(--border)";
-            clearInterval(timer);
-            return;
+            clearInterval(timer); return;
           }
-
           const mins = Math.floor(remaining / 60000);
           const secs = Math.floor((remaining % 60000) / 1000);
-          el.textContent = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-
-          // Turn red in last 2 minutes
+          el.textContent = `${String(mins).padStart(2,"0")}:${String(secs).padStart(2,"0")}`;
           if (remaining < 120000) {
             el.style.color = "crimson";
             const card = document.getElementById(`order-card-${o.id}`);
@@ -322,12 +684,13 @@
           }
         }
 
-        tick(); // Run immediately
+        tick();
         const timer = setInterval(tick, 1000);
         activeTimers.push(timer);
       });
     }
 
+    // ── Load orders ─────────────────────────────────────────────────────────
     async function loadOrders() {
       const { data: sess } = await supabase.auth.getSession();
       const user = sess?.session?.user;
@@ -342,6 +705,7 @@
           id, status, payment_method,
           subtotal_inr, shipping_inr, discount_inr, total_inr,
           razorpay_payment_link_url, shiprocket_awb,
+          return_status, return_reason,
           created_at,
           order_items(qty, title, price_inr)
         `)
@@ -356,8 +720,6 @@
       const orders = data ?? [];
       statusMsg.textContent = orders.length ? "" : "You have no orders yet.";
       list.innerHTML = orders.map(renderOrder).join("");
-
-      // Start live countdown timers for payment_link_created orders
       startCountdowns(orders);
     }
 
