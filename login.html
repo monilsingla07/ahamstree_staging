@@ -399,6 +399,7 @@ function renderLoggedIn(email) {
 
   document.getElementById("logout").onclick = async () => {
     await supabase.auth.signOut();
+    renderLoggedOut(); // Switch UI immediately — don't wait for onAuthStateChange
   };
 }
 
