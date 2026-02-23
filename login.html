@@ -397,10 +397,10 @@ function renderLoggedIn(email) {
     </div>
   `;
 
-  document.getElementById("logout").onclick = async () => {
-    await supabase.auth.signOut();
-    renderLoggedOut(); // Switch UI immediately — don't wait for onAuthStateChange
-  };
+ document.getElementById("logout").onclick = async () => {
+  await supabase.auth.signOut();
+  window.location.href = "index.html"; // full redirect, clears all state
+};
 }
 
 async function upsertProfileIfPending(userId) {
