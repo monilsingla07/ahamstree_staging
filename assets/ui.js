@@ -298,16 +298,24 @@ function initMobileMenu() {
   if (drawer.dataset.menuInit === "1") return;
   drawer.dataset.menuInit = "1";
 
-  function open() {
-    drawer.classList.add("open");
-    drawer.setAttribute("aria-hidden", "false");
-    document.body.classList.add("no-scroll");
-  }
-  function close() {
-    drawer.classList.remove("open");
-    drawer.setAttribute("aria-hidden", "true");
-    document.body.classList.remove("no-scroll");
-  }
+ let savedScrollY = 0;
+
+function open() {
+  savedScrollY = window.scrollY;
+  drawer.classList.add("open");
+  drawer.setAttribute("aria-hidden", "false");
+  document.body.style.position = "fixed";
+  document.body.style.top = `-${savedScrollY}px`;
+  document.body.style.width = "100%";
+}
+function close() {
+  drawer.classList.remove("open");
+  drawer.setAttribute("aria-hidden", "true");
+  document.body.style.position = "";
+  document.body.style.top = "";
+  document.body.style.width = "";
+  window.scrollTo(0, savedScrollY); // restore position
+}
 
   openBtn.addEventListener("click", open);
   closeBtn.addEventListener("click", close);
