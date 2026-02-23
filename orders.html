@@ -17,7 +17,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/styles.css" />
   <style>
-    /* ── Status badges ──────────────────────────────────────────────────── */
     .status-badge {
       display: inline-flex; align-items: center; gap: 5px;
       padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 800;
@@ -29,7 +28,6 @@
     .status-badge.pending   { background: #fef9c3; color: #854d0e; }
     .status-badge.failed    { background: #fee2e2; color: #991b1b; }
     .status-badge.cancelled { background: #f3f4f6; color: #6b7280; }
-
     .payment-pill {
       display: inline-flex; align-items: center; gap: 4px;
       padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700;
@@ -38,7 +36,7 @@
     .payment-pill.cod    { background: #fff7ed; color: #9a3412; }
     .payment-pill.online { background: #eff6ff; color: #1d4ed8; }
 
-    /* ── Pulsing border for urgent pending orders ───────────────────────── */
+    /* Pulsing border for urgent pending orders */
     @keyframes urgentPulse {
       0%, 100% { border-color: var(--brand); }
       50%       { border-color: crimson; }
@@ -81,9 +79,9 @@
     }
     .tl-dot.latest { background: #1e40af; border-color: #1e40af; color: #fff; }
     .tl-body { padding-bottom: 18px; }
-    .tl-act   { font-size: 13px; font-weight: 700; line-height: 1.35; color: #1e293b; }
+    .tl-act  { font-size: 13px; font-weight: 700; line-height: 1.35; color: #1e293b; }
     .tl-act.dim { color: #64748b; font-weight: 500; }
-    .tl-meta  { font-size: 11px; color: #64748b; margin-top: 2px; }
+    .tl-meta { font-size: 11px; color: #64748b; margin-top: 2px; }
 
     /* ── Return modal ───────────────────────────────────────────────────── */
     .modal-overlay {
@@ -113,8 +111,8 @@
     }
 
     /* ── Return status badges ───────────────────────────────────────────── */
-    .status-badge.ret-req  { background: #eff6ff; color: #1e40af; border:1px solid #bfdbfe; }
-    .status-badge.ret-ok   { background: #f0fdf4; color: #14532d; border:1px solid #86efac; }
+    .status-badge.ret-req  { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+    .status-badge.ret-ok   { background: #f0fdf4; color: #14532d; border: 1px solid #86efac; }
     .status-badge.ret-pick { background: #f0fdf4; color: #14532d; }
     .status-badge.ret-rej  { background: #fee2e2; color: #991b1b; }
   </style>
@@ -210,10 +208,66 @@
 
     const statusMsg = document.getElementById("statusMsg");
     const list      = document.getElementById("list");
+
+    // Track all active countdown timers so we can clear them on re-render
     const activeTimers = [];
 
-    // ── Payment reservation TTL (keep in sync with backend) ───────────────
+    function money(v) {
+      return "₹" + Number(v || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
+    }
+
+    function statusBadge(st) {
+      const map = {
+        paid:                  { label: "Paid",             cls: "paid"      },
+        confirmed:             { label: "Confirmed",        cls: "confirmed" },
+        payment_link_created:  { label: "Payment pending",  cls: "pending"   },
+        payment_link_failed:   { label: "Link failed",      cls: "failed"    },
+        created:               { label: "Payment pending",  cls: "pending"   },
+        failed:                { label: "Payment failed",   cls: "failed"    },
+        expired:               { label: "Link expired",     cls: "failed"    },
+        cancelled:             { label: "Cancelled",        cls: "cancelled" },
+        shipped:               { label: "Shipped",          cls: "shipped"   },
+        delivered:             { label: "Delivered",        cls: "delivered" },
+      };
+      const s = map[st] || { label: st || "Unknown", cls: "pending" };
+      return `<span class="status-badge ${s.cls}">${s.label}</span>`;
+    }
+
+    function paymentPill(method) {
+      if (method === "cod") return `<span class="payment-pill cod">💵 Cash on Delivery</span>`;
+      return `<span class="payment-pill online">💳 Online Payment</span>`;
+    }
+
+    function formatDate(iso) {
+      if (!iso) return "—";
+      return new Date(iso).toLocaleString("en-IN", {
+        day: "numeric", month: "short", year: "numeric",
+        hour: "2-digit", minute: "2-digit"
+      });
+    }
+
+    // Determine how much time is left on a payment_link_created order.
+    // IMPORTANT: keep this in sync with your backend (RESERVATION_TTL_MINUTES).
+    // This is used to decide whether to show “Complete payment” or mark the link as expired.
     const RESERVATION_TTL_MS = 10 * 60 * 1000;
+
+    function getExpiryMs(order) {
+      if (!order.created_at) return 0;
+      return new Date(order.created_at).getTime() + RESERVATION_TTL_MS;
+    }
+
+    // ── Return status badge ─────────────────────────────────────────────────
+    function retStatusBadge(rs) {
+      if (!rs) return "";
+      const map = {
+        requested : { label: "↩ Return Requested", cls: "ret-req"  },
+        approved  : { label: "↩ Return Approved",  cls: "ret-ok"   },
+        picked    : { label: "↩ Item Picked Up",    cls: "ret-pick" },
+        rejected  : { label: "↩ Return Rejected",   cls: "ret-rej"  },
+      };
+      const s = map[rs] || { label: "↩ " + rs, cls: "ret-req" };
+      return `<span class="status-badge ${s.cls}">${s.label}</span>`;
+    }
 
     // ══════════════════════════════════════════════════════════════════════
     // RETURN MODAL
@@ -221,16 +275,15 @@
     let retOrderId = null;
     let retReason  = "";
 
-    const modal         = document.getElementById("returnModal");
-    const retFormBody   = document.getElementById("retFormBody");
-    const retSuccess    = document.getElementById("retSuccess");
-    const retStatus     = document.getElementById("retStatus");
-    const retSubmitBtn  = document.getElementById("retSubmit");
-    const reasonChips   = document.querySelectorAll(".chip[data-r]");
-    const otherWrap     = document.getElementById("otherWrap");
-    const otherTxt      = document.getElementById("otherTxt");
+    const modal        = document.getElementById("returnModal");
+    const retFormBody  = document.getElementById("retFormBody");
+    const retSuccess   = document.getElementById("retSuccess");
+    const retStatus    = document.getElementById("retStatus");
+    const retSubmitBtn = document.getElementById("retSubmit");
+    const reasonChips  = document.querySelectorAll(".chip[data-r]");
+    const otherWrap    = document.getElementById("otherWrap");
+    const otherTxt     = document.getElementById("otherTxt");
 
-    // Reason chip selection
     reasonChips.forEach(chip => {
       chip.addEventListener("click", () => {
         reasonChips.forEach(c => c.classList.remove("sel"));
@@ -293,9 +346,12 @@
           return_requested_at: new Date().toISOString(),
         }).eq("id", retOrderId).then(() => {});
 
-        // Update UI
+        // Update card badge + remove button immediately
         const badge = document.getElementById(`ret-badge-${retOrderId}`);
-        if (badge) badge.innerHTML = retStatusBadge("requested");
+        if (badge) badge.innerHTML = `
+          <div style="padding:8px 16px; background:#eff6ff; border-bottom:1px solid #bfdbfe;">
+            ${retStatusBadge("requested")}
+          </div>`;
         const btn = document.getElementById(`ret-btn-${retOrderId}`);
         if (btn) btn.remove();
 
@@ -317,21 +373,19 @@
       const btn   = document.getElementById(`tb-${orderId}`);
       if (!panel || !btn) return;
 
-      const isOpen = panel.classList.contains("open");
-
-      if (isOpen) {
+      if (panel.classList.contains("open")) {
         panel.classList.remove("open");
         btn.textContent = "▼ Track order";
         return;
       }
 
+      // Already loaded — just re-open
       if (panel.dataset.loaded === "1") {
         panel.classList.add("open");
         btn.textContent = "▲ Hide tracking";
         return;
       }
 
-      // Load for the first time
       panel.innerHTML = `<div class="small" style="color:#64748b;">Fetching live tracking…</div>`;
       panel.classList.add("open");
       btn.textContent = "▲ Hide tracking";
@@ -344,11 +398,10 @@
 
         if (error) throw new Error(error.message);
 
-        const td    = data?.tracking_data;
-        const st    = td?.shipment_track?.[0] || {};
-        const acts  = (td?.shipment_track_activities || [])
+        const td   = data?.tracking_data;
+        const st   = td?.shipment_track?.[0] || {};
+        const acts = (td?.shipment_track_activities || [])
           .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-
         const safeUrl = (td?.track_url || "").match(/^https?:\/\//)
           ? td.track_url : "";
 
@@ -357,26 +410,22 @@
         // Summary row
         html += `<div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-bottom:12px;">`;
         if (st.current_status) {
-          html += `<div style="font-weight:900;font-size:14px;color:#1e293b;">
-            📦 ${escapeHtml(st.current_status)}</div>`;
+          html += `<div style="font-weight:900; font-size:14px; color:#1e293b;">📦 ${escapeHtml(st.current_status)}</div>`;
         }
         if (st.etd) {
-          html += `<div class="small" style="color:#64748b;">
-            Expected: <strong>${escapeHtml(st.etd)}</strong></div>`;
+          html += `<div class="small" style="color:#64748b;">Expected: <strong>${escapeHtml(st.etd)}</strong></div>`;
         }
         if (st.courier_name) {
-          html += `<div class="small" style="color:#64748b;">
-            via <strong>${escapeHtml(st.courier_name)}</strong></div>`;
+          html += `<div class="small" style="color:#64748b;">via <strong>${escapeHtml(st.courier_name)}</strong></div>`;
         }
         if (safeUrl) {
           html += `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer"
-            class="small" style="color:var(--brand,#7c3aed);font-weight:700;margin-left:auto;">
+            class="small" style="color:var(--brand,#7c3aed); font-weight:700; margin-left:auto;">
             Carrier tracking →</a>`;
         }
         html += `</div>`;
 
-        html += `<div class="small" style="color:#1e40af;margin-bottom:14px;">
-          AWB: <strong>${escapeHtml(awb)}</strong></div>`;
+        html += `<div class="small" style="color:#1e40af; margin-bottom:14px;">AWB: <strong>${escapeHtml(awb)}</strong></div>`;
 
         // Timeline
         if (acts.length) {
@@ -404,179 +453,142 @@
           });
           html += `</div>`;
         } else {
-          html += `<div class="small" style="color:#64748b;">
-            No tracking events yet — check back soon.</div>`;
+          html += `<div class="small" style="color:#64748b;">No tracking events yet — check back soon.</div>`;
         }
 
         panel.innerHTML = html;
         panel.dataset.loaded = "1";
 
       } catch (err) {
-        panel.innerHTML = `<div class="small" style="color:crimson;">
-          Could not load tracking: ${escapeHtml(err.message)}</div>`;
+        panel.innerHTML = `<div class="small" style="color:crimson;">Could not load tracking: ${escapeHtml(err.message)}</div>`;
       }
 
       btn.disabled = false;
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // HELPERS
-    // ══════════════════════════════════════════════════════════════════════
-    function money(v) {
-      return "₹" + Number(v || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
-    }
+    // Expose to onclick attrs in rendered HTML
+    window.__track  = (oid, awb) => toggleTracker(oid, awb);
+    window.__return = (oid)      => openReturnModal(oid);
 
-    function statusBadge(st) {
-      const map = {
-        paid:                  { label: "Paid",             cls: "paid"      },
-        confirmed:             { label: "Confirmed",        cls: "confirmed" },
-        payment_link_created:  { label: "Payment pending",  cls: "pending"   },
-        payment_link_failed:   { label: "Link failed",      cls: "failed"    },
-        created:               { label: "Payment pending",  cls: "pending"   },
-        failed:                { label: "Payment failed",   cls: "failed"    },
-        expired:               { label: "Link expired",     cls: "failed"    },
-        cancelled:             { label: "Cancelled",        cls: "cancelled" },
-        shipped:               { label: "Shipped",          cls: "shipped"   },
-        delivered:             { label: "Delivered",        cls: "delivered" },
-      };
-      const s = map[st] || { label: st || "Unknown", cls: "pending" };
-      return `<span class="status-badge ${s.cls}">${s.label}</span>`;
-    }
-
-    function retStatusBadge(rs) {
-      if (!rs) return "";
-      const map = {
-        requested : { label: "↩ Return Requested", cls: "ret-req"  },
-        approved  : { label: "↩ Return Approved",  cls: "ret-ok"   },
-        picked    : { label: "↩ Item Picked Up",    cls: "ret-pick" },
-        rejected  : { label: "↩ Return Rejected",   cls: "ret-rej"  },
-      };
-      const s = map[rs] || { label: "↩ " + rs, cls: "ret-req" };
-      return `<span class="status-badge ${s.cls}">${s.label}</span>`;
-    }
-
-    function paymentPill(method) {
-      if (method === "cod") return `<span class="payment-pill cod">💵 Cash on Delivery</span>`;
-      return `<span class="payment-pill online">💳 Online Payment</span>`;
-    }
-
-    function formatDate(iso) {
-      if (!iso) return "—";
-      return new Date(iso).toLocaleString("en-IN", {
-        day: "numeric", month: "short", year: "numeric",
-        hour: "2-digit", minute: "2-digit"
-      });
-    }
-
-    // ══════════════════════════════════════════════════════════════════════
-    // RENDER ORDER CARD
-    // ══════════════════════════════════════════════════════════════════════
     function renderOrder(o) {
       const isCod    = o.payment_method === "cod";
       const isOnline = !isCod;
-      const payLink  = o.razorpay_payment_link_url;
+
+      const payLink     = o.razorpay_payment_link_url;
       const safePayHref = safeHref(payLink);
 
-      const isPendingPay  = isOnline && o.status === "payment_link_created" && !!safePayHref;
-      const expiryMs      = isPendingPay ? new Date(o.created_at).getTime() + RESERVATION_TTL_MS : 0;
-      const isStillActive = isPendingPay && (expiryMs - Date.now() > 0);
-      const effectiveSt   = (isPendingPay && !isStillActive) ? "expired" : o.status;
+      // Pending online payment (Payment Link created)
+      // We treat it as *expired* on the UI once the reservation TTL has passed,
+      // even if the DB status hasn't yet been updated.
+      const isPendingPayment = isOnline && o.status === "payment_link_created" && !!safePayHref;
+      const expiryMs         = isPendingPayment ? getExpiryMs(o) : 0;
+      const isStillActive    = isPendingPayment && (expiryMs - Date.now() > 0);
+      const effectiveStatus  = (isPendingPayment && !isStillActive) ? "expired" : o.status;
 
-      const canRetry    = isOnline && ["payment_link_failed", "failed"].includes(o.status) && !!safePayHref;
-      const awb         = o.shiprocket_awb;
-      const canTrack    = !!awb && ["shipped", "delivered"].includes(o.status);
+      // "Retry" for failed/expired links (no countdown — link may still work or
+      // the user can go back to checkout to create a new one)
+      const canRetryFailed = isOnline &&
+        ["payment_link_failed", "failed"].includes(o.status) &&
+        !!safePayHref;
+
+      const awb      = o.shiprocket_awb;
+      const canTrack = !!awb && ["shipped", "delivered"].includes(o.status);
       const isDelivered = o.status === "delivered";
       const rs          = o.return_status;
       const canReturn   = isDelivered && !rs;
 
-      const shortId   = escapeHtml(o.id.slice(0, 8).toUpperCase());
-      const cardId    = `order-card-${o.id}`;
-      const cdId      = `countdown-${o.id}`;
-
       const items = (o.order_items || [])
         .map(it => `
-          <div style="display:flex;justify-content:space-between;gap:10px;
-                      padding:8px 0;border-bottom:1px solid var(--border-light);">
-            <div class="small" style="flex:1;">${Number(it.qty||0)} × ${escapeHtml(it.title)}</div>
-            <div class="small" style="font-weight:700;flex-shrink:0;">${money(it.price_inr)}</div>
-          </div>`).join("");
+          <div style="display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid var(--border-light);">
+            <div class="small" style="flex:1;">${Number(it.qty || 0)} × ${escapeHtml(it.title)}</div>
+            <div class="small" style="font-weight:700; flex-shrink:0;">${money(it.price_inr)}</div>
+          </div>`)
+        .join("");
 
-      const discountRow = Number(o.discount_inr) > 0
+      const shortId    = escapeHtml(o.id.slice(0, 8).toUpperCase());
+      const countdownId = `countdown-${o.id}`;
+      const cardId      = `order-card-${o.id}`;
+
+      const discountRow = (Number(o.discount_inr) > 0)
         ? `<div style="display:flex;justify-content:space-between;gap:8px;margin-top:4px;">
              <div class="small" style="opacity:.7;">Discount</div>
-             <div class="small" style="color:green;font-weight:700;">−${money(o.discount_inr)}</div>
-           </div>` : "";
+             <div class="small" style="color:green; font-weight:700;">−${money(o.discount_inr)}</div>
+           </div>`
+        : "";
 
-      // ── Pending payment banners ─────────────────────────────────────────
-      const pendingBanner = (isPendingPay && isStillActive) ? `
-        <div style="padding:14px 16px;background:var(--brand-light);border-top:2px solid var(--brand);">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      // ── Pending payment banner (only while still active) ─────────────────
+      const pendingBanner = (isPendingPayment && isStillActive) ? `
+        <div style="padding:14px 16px; background:var(--brand-light); border-top:2px solid var(--brand);">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
             <div>
-              <div style="font-weight:900;font-size:14px;margin-bottom:4px;">⚡ Payment not completed</div>
-              <div class="small" style="opacity:.8;margin-bottom:8px;">
-                Items reserved — complete payment before the timer runs out.
+              <div style="font-weight:900; font-size:14px; margin-bottom:4px;">⚡ Payment not completed</div>
+              <div class="small" style="opacity:.8; margin-bottom:8px;">
+                Your items are reserved. Complete payment before the timer runs out.
               </div>
-              <div style="display:flex;align-items:center;gap:8px;">
+              <div style="display:flex; align-items:center; gap:8px;">
                 <div class="small" style="opacity:.7;">Time left:</div>
-                <div id="${cdId}" style="font-size:20px;font-weight:900;color:var(--brand);
-                  letter-spacing:1px;min-width:60px;">--:--</div>
+                <div id="${countdownId}" style="font-size:20px; font-weight:900; color:var(--brand); letter-spacing:1px; min-width:60px;">--:--</div>
               </div>
             </div>
-            <a class="btn" href="${safePayHref}" style="padding:10px 18px;font-size:14px;">
-              Complete payment →
-            </a>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; flex-shrink:0;">
+              <a class="btn" href="${safePayHref}" style="padding:10px 18px; font-size:14px;">
+                Complete payment →
+              </a>
+            </div>
           </div>
         </div>` : "";
 
-      const expiredBanner = (isPendingPay && !isStillActive) ? `
-        <div style="padding:14px 16px;background:#fff7ed;border-top:2px solid #f97316;">
-          <div style="font-weight:900;font-size:14px;margin-bottom:4px;">⏱️ Payment window expired</div>
-          <div class="small" style="opacity:.85;margin-bottom:10px;">
-            This payment link is no longer active. Start checkout again for a fresh link.
+      // ── Expired payment banner (when TTL is over) ────────────────────────
+      // No pay button here — payment window is over.
+      const expiredBanner = (isPendingPayment && !isStillActive) ? `
+        <div style="padding:14px 16px; background:#fff7ed; border-top:2px solid #f97316;">
+          <div style="font-weight:900; font-size:14px; margin-bottom:4px;">⏱️ Payment window expired</div>
+          <div class="small" style="opacity:.85; margin-bottom:10px;">
+            This payment link is no longer active. Please start checkout again to create a fresh payment link.
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <a class="btn secondary" href="cart.html" style="padding:10px 18px;font-size:14px;">Cart</a>
-            <a class="btn secondary" href="checkout.html" style="padding:10px 18px;font-size:14px;">Checkout</a>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <a class="btn secondary" href="cart.html" style="padding:10px 18px; font-size:14px;">Go to cart</a>
+            <a class="btn secondary" href="checkout.html" style="padding:10px 18px; font-size:14px;">Go to checkout</a>
           </div>
         </div>` : "";
 
       return `
-        <div class="card" id="${cardId}"
-          style="border-radius:16px;overflow:hidden;
-                 ${isStillActive ? "border:2px solid var(--brand);" : ""}">
+        <div class="card" id="${cardId}" style="border-radius:16px; overflow:hidden;${isStillActive ? " border:2px solid var(--brand);" : ""}">
 
-          <!-- ── Header ── -->
-          <div style="padding:14px 16px;display:flex;align-items:flex-start;
-                      justify-content:space-between;gap:12px;flex-wrap:wrap;
-                      border-bottom:1px solid var(--border-light);">
+          <!-- Header row -->
+          <div style="padding:14px 16px; display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; border-bottom:1px solid var(--border-light);">
             <div>
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
-                <span style="font-weight:900;font-size:15px;">Order #${shortId}</span>
-                ${statusBadge(effectiveSt)}
+              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
+                <span style="font-weight:900; font-size:15px;">Order #${shortId}</span>
+                ${statusBadge(effectiveStatus)}
                 ${paymentPill(o.payment_method)}
               </div>
               <div class="small" style="opacity:.65;">${formatDate(o.created_at)}</div>
             </div>
 
-            <!-- Action buttons -->
-            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-              ${canRetry
-                ? `<a class="btn secondary" style="padding:8px 14px;font-size:13px;"
-                     href="${safePayHref}">Retry payment →</a>`
+            <!-- Action buttons (non-pending states) -->
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+              ${canRetryFailed
+                ? `<a class="btn secondary" style="padding:8px 14px; font-size:13px;"
+                     href="${safePayHref}">
+                     Retry payment →
+                   </a>`
                 : ""}
               ${canTrack
-                ? `<button id="tb-${o.id}"
+                ? `<button
+                     id="tb-${o.id}"
                      class="btn secondary"
-                     style="padding:8px 14px;font-size:13px;"
+                     style="padding:8px 14px; font-size:13px;"
                      type="button"
                      onclick="window.__track('${o.id}','${escapeHtml(awb)}')">
                      ▼ Track order
                    </button>`
                 : ""}
               ${canReturn
-                ? `<button id="ret-btn-${o.id}"
+                ? `<button
+                     id="ret-btn-${o.id}"
                      class="btn secondary"
-                     style="padding:8px 14px;font-size:13px;"
+                     style="padding:8px 14px; font-size:13px;"
                      type="button"
                      onclick="window.__return('${o.id}')">
                      ↩ Return
@@ -585,10 +597,10 @@
             </div>
           </div>
 
-          <!-- Return status strip -->
+          <!-- Return status strip (shown when a return exists) -->
           <div id="ret-badge-${o.id}">
             ${rs
-              ? `<div style="padding:8px 16px;background:#eff6ff;border-bottom:1px solid #bfdbfe;">
+              ? `<div style="padding:8px 16px; background:#eff6ff; border-bottom:1px solid #bfdbfe;">
                    ${retStatusBadge(rs)}
                  </div>`
               : ""}
@@ -600,67 +612,69 @@
           </div>
 
           <!-- Totals -->
-          <div style="padding:12px 16px;border-top:1px solid var(--border-light);background:#fafafa;">
+          <div style="padding:12px 16px; border-top:1px solid var(--border-light); background:#fafafa;">
             ${discountRow}
-            <div style="display:flex;justify-content:space-between;gap:8px;margin-top:4px;">
+            <div style="display:flex; justify-content:space-between; gap:8px; margin-top:4px;">
               <div class="small" style="opacity:.7;">Shipping</div>
               <div class="small">${money(o.shipping_inr)}</div>
             </div>
-            <div style="display:flex;justify-content:space-between;gap:8px;
-                        margin-top:8px;font-weight:900;">
+            <div style="display:flex; justify-content:space-between; gap:8px; margin-top:8px; font-weight:900;">
               <div>Total</div>
               <div>${money(o.total_inr)}</div>
             </div>
           </div>
 
+          <!-- Pending payment banner with countdown -->
           ${pendingBanner}
+
+          <!-- Expired payment banner -->
           ${expiredBanner}
 
+          <!-- COD pending note -->
           ${(isCod && o.status === "confirmed")
-            ? `<div style="padding:10px 16px;background:#fff7ed;border-top:1px solid #fed7aa;">
+            ? `<div style="padding:10px 16px; background:#fff7ed; border-top:1px solid #fed7aa;">
                  <div class="small" style="color:#9a3412;">
                    📦 COD order — our team will contact you to confirm dispatch.
                  </div>
                </div>`
             : ""}
 
+          <!-- Shipping info -->
           ${awb
-            ? `<div style="padding:10px 16px;background:#eff6ff;border-top:1px solid #bfdbfe;">
+            ? `<div style="padding:10px 16px; background:#eff6ff; border-top:1px solid #bfdbfe;">
                  <div class="small" style="color:#1e40af;">
                    🚚 AWB: <strong>${escapeHtml(awb)}</strong>
                  </div>
                </div>`
             : ""}
 
-          <!-- Inline tracker (collapsed by default) -->
+          <!-- Inline tracker panel (collapsed by default, toggled by Track button) -->
           ${canTrack
             ? `<div class="tracker-panel" id="tp-${o.id}"></div>`
             : ""}
 
-          <!-- Return eligibility note for newly delivered orders -->
+          <!-- Return eligibility note for delivered orders with no return yet -->
           ${(isDelivered && !rs)
-            ? `<div style="padding:8px 16px;background:#f8fafc;border-top:1px solid var(--border-light);">
+            ? `<div style="padding:8px 16px; background:#f8fafc; border-top:1px solid var(--border-light);">
                  <div class="small" style="color:#64748b;">
                    Returns accepted within 10 days of delivery ·
-                   <a href="returns.html" style="color:var(--brand,#7c3aed);font-weight:600;">
-                     Return policy →</a>
+                   <a href="returns.html" style="color:var(--brand,#7c3aed); font-weight:600;">Return policy →</a>
                  </div>
                </div>`
             : ""}
-        </div>`;
+        </div>
+      `;
     }
 
-    // ── Expose handlers as globals so onclick attrs can reach them ──────────
-    window.__track  = (oid, awb) => toggleTracker(oid, awb);
-    window.__return = (oid)      => openReturnModal(oid);
-
-    // ── Countdown timers ────────────────────────────────────────────────────
+    // ── Start countdown timers after HTML is rendered ────────────────────────
     function startCountdowns(orders) {
+      // Clear any previous timers
       activeTimers.forEach(clearInterval);
       activeTimers.length = 0;
 
       orders.forEach(o => {
         if (o.status !== "payment_link_created" || !o.razorpay_payment_link_url) return;
+
         const el = document.getElementById(`countdown-${o.id}`);
         if (!el) return;
 
@@ -668,15 +682,22 @@
 
         function tick() {
           const remaining = expiryMs - Date.now();
+
           if (remaining <= 0) {
-            el.textContent = "Expired"; el.style.color = "#6b7280";
+            el.textContent = "Expired";
+            el.style.color = "#6b7280";
+            // Dim the card — reservation has released
             const card = document.getElementById(`order-card-${o.id}`);
             if (card) card.style.borderColor = "var(--border)";
-            clearInterval(timer); return;
+            clearInterval(timer);
+            return;
           }
+
           const mins = Math.floor(remaining / 60000);
           const secs = Math.floor((remaining % 60000) / 1000);
-          el.textContent = `${String(mins).padStart(2,"0")}:${String(secs).padStart(2,"0")}`;
+          el.textContent = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+
+          // Turn red in last 2 minutes
           if (remaining < 120000) {
             el.style.color = "crimson";
             const card = document.getElementById(`order-card-${o.id}`);
@@ -684,13 +705,12 @@
           }
         }
 
-        tick();
+        tick(); // Run immediately
         const timer = setInterval(tick, 1000);
         activeTimers.push(timer);
       });
     }
 
-    // ── Load orders ─────────────────────────────────────────────────────────
     async function loadOrders() {
       const { data: sess } = await supabase.auth.getSession();
       const user = sess?.session?.user;
@@ -720,6 +740,8 @@
       const orders = data ?? [];
       statusMsg.textContent = orders.length ? "" : "You have no orders yet.";
       list.innerHTML = orders.map(renderOrder).join("");
+
+      // Start live countdown timers for payment_link_created orders
       startCountdowns(orders);
     }
 
