@@ -384,18 +384,34 @@ hr { border: none; border-top: 1px solid var(--border-light); margin: 20px 0; }
 
 /* Mobile drawer */
 .mobile-drawer {
-  position: fixed; inset: 0;
+  osition: fixed;
+  inset: 0;
   background: rgba(0,0,0,0.45);
-  display: none; z-index: 200;
-  /* Force full visual viewport coverage: */
-  min-height: 100dvh; /* dvh = dynamic viewport height, accounts for browser chrome */
+  display: none;
+  z-index: 3000; /* was 200 — put it above the fixed header */
+  min-height: 100dvh;
   min-height: -webkit-fill-available;
+
+  /* optional but nice: makes the panel layout reliable */
+  justify-content: flex-start;
 }
-.mobile-drawer.open { display: block; }
+.mobile-drawer.open { 
+  display: flex;  /* was block */
+}
 .mobile-drawer-panel {
-  height: 100dvh; /* same here */
+  height: 100dvh;
   min-height: -webkit-fill-available;
-  width: 84%; max-width: 340px;
+  width: 84%;
+  max-width: 340px;
+
+  /* ✅ THIS is the missing bit */
+  background: rgba(255,255,255,0.98); /* or use: var(--surface) */
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+
+  padding: 18px 16px;
+  box-shadow: var(--shadow-lg);
+  overflow-y: auto;
 }
 body.no-scroll {
   overflow: hidden;
