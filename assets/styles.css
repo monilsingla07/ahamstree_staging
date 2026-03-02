@@ -152,6 +152,14 @@ nav a { margin-right: 12px; text-decoration: none; color: #111; }
   background: var(--bg-warm);
   transition: transform 0.5s cubic-bezier(0.4,0,0.2,1);
 }
+/* Product listing images: show the full photo (no cropping) */
+.card.product-card img {
+  object-fit: contain;  /* shows full image */
+  background: var(--bg-warm);
+}
+
+/* Optional: stop zooming product thumbnails on hover (prevents re-cropping) */
+.card.product-card:hover img { transform: none; }
 .card:hover img { transform: scale(1.06); }
 .card .p { padding: var(--space-md); }
 
