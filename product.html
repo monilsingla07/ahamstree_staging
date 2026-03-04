@@ -112,6 +112,7 @@
       <button id="lbClose" class="lb-btn" type="button">✕</button>
       <button id="lbPrev" class="lb-btn" type="button">‹</button>
       <button id="lbNext" class="lb-btn" type="button">›</button>
+      <div id="lb-zoom-hint">Double-click image to zoom</div>
     </div>
   </div>
 
@@ -219,16 +220,25 @@
       const lbPrev = document.getElementById("lbPrev");
       const lbNext = document.getElementById("lbNext");
 
+      const lbZoomHint = document.getElementById("lb-zoom-hint");
+
+      function resetZoom() {
+        lightboxImg.classList.remove("lb-zoomed");
+        if (lbZoomHint) lbZoomHint.style.display = "";
+      }
+
       function openLightbox(idx) {
         if (!images.length) return;
         currentIndex = clamp(idx, 0, images.length - 1);
         lightboxImg.src = safeUrl(images[currentIndex].image_url, { type: "src" }) || "";
+        resetZoom();
         lightbox.classList.add("open");
         lightbox.setAttribute("aria-hidden", "false");
         document.body.style.overflow = "hidden";
       }
 
       function closeLightbox() {
+        resetZoom();
         lightbox.classList.remove("open");
         lightbox.setAttribute("aria-hidden", "true");
         document.body.style.overflow = "";
@@ -238,13 +248,21 @@
         if (!images.length) return;
         currentIndex = (currentIndex + 1) % images.length;
         lightboxImg.src = safeUrl(images[currentIndex].image_url, { type: "src" }) || "";
+        resetZoom();
       }
 
       function showPrev() {
         if (!images.length) return;
         currentIndex = (currentIndex - 1 + images.length) % images.length;
         lightboxImg.src = safeUrl(images[currentIndex].image_url, { type: "src" }) || "";
+        resetZoom();
       }
+
+      // Double-click to zoom in/out on the lightbox image
+      lightboxImg.addEventListener("dblclick", () => {
+        lightboxImg.classList.toggle("lb-zoomed");
+        if (lbZoomHint) lbZoomHint.style.display = "none";
+      });
 
       // Clicking main image opens lightbox
       mainImg.addEventListener("click", () => {

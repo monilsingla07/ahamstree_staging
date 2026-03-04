@@ -406,6 +406,15 @@
       updateUI();
       st.isLoading = false;
 
+      // Restore scroll on back navigation (first load only)
+      if (st.offset === slice.length) {
+        const savedScroll = sessionStorage.getItem("scrollPos:" + location.href);
+        if (savedScroll) {
+          requestAnimationFrame(() => window.scrollTo(0, Number(savedScroll)));
+          sessionStorage.removeItem("scrollPos:" + location.href);
+        }
+      }
+
       if (!window.__saleBound){
         window.__saleBound = true;
         loadMoreBtn.addEventListener("click", () => loadSale(false));
@@ -420,5 +429,11 @@
 
     loadSale(true);
   </script>
+
+<script>
+  window.addEventListener("pagehide", () => {
+    sessionStorage.setItem("scrollPos:" + location.href, String(window.scrollY));
+  });
+</script>
 </body>
 </html>

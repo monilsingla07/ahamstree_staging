@@ -424,9 +424,22 @@
       }
 
       grid.innerHTML = normalized.map((p, i) => productCard(p, i)).join("");
+
+      // Restore scroll if user navigated back
+      const savedScroll = sessionStorage.getItem("scrollPos:" + location.href);
+      if (savedScroll) {
+        requestAnimationFrame(() => window.scrollTo(0, Number(savedScroll)));
+        sessionStorage.removeItem("scrollPos:" + location.href);
+      }
     }
 
     loadCollection();
   </script>
+
+<script>
+  window.addEventListener("pagehide", () => {
+    sessionStorage.setItem("scrollPos:" + location.href, String(window.scrollY));
+  });
+</script>
 </body>
 </html>

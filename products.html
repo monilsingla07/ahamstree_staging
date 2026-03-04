@@ -677,6 +677,15 @@
     offset += slice.length;
     updateLoadMoreUI();
     isLoading = false;
+
+    // Restore scroll position if user navigated back to this page
+    if (isFirst) {
+      const savedScroll = sessionStorage.getItem("scrollPos:" + location.href);
+      if (savedScroll) {
+        requestAnimationFrame(() => window.scrollTo(0, Number(savedScroll)));
+        sessionStorage.removeItem("scrollPos:" + location.href);
+      }
+    }
   }
 
   function resetAndLoad(){
@@ -728,6 +737,13 @@
     }, { rootMargin: "600px" });
     obs.observe(sentinel);
   }
+</script>
+
+<script>
+  // Save scroll position when leaving this page so we can restore it on back navigation
+  window.addEventListener("pagehide", () => {
+    sessionStorage.setItem("scrollPos:" + location.href, String(window.scrollY));
+  });
 </script>
 
 </body>
