@@ -296,6 +296,9 @@
       return `
         <div class="p-card" style="animation-delay:${(idx % 8) * 60}ms">
           <a href="product.html?id=${encodeURIComponent(p.id)}&from=new-arrivals">
+            <div class="p-card-img">
+              ${imgHtml}
+              ${hasNewBadge ? `<div class="p-card-new-badge">New</div>` : ""}
               ${pctOff > 0 ? `<div class="p-card-sale-badge">${pctOff}% off</div>` : ""}
               ${soldOut ? `<div class="p-card-sold-overlay"><span class="p-card-sold-label">Sold Out</span></div>` : ""}
             </div>
@@ -333,10 +336,10 @@
       status.textContent = `${rows.length} new arrivals`;
       grid.innerHTML = rows.map((p, i) => productCard(p, i)).join("");
 
-      // Restore scroll if user navigated back
+      // Restore scroll — wait 300ms so images can start loading and page height settles
       const savedScroll = sessionStorage.getItem("scrollPos:" + location.href);
       if (savedScroll) {
-        requestAnimationFrame(() => window.scrollTo(0, Number(savedScroll)));
+        setTimeout(() => { window.scrollTo(0, Number(savedScroll)); }, 300);
         sessionStorage.removeItem("scrollPos:" + location.href);
       }
     }
@@ -345,9 +348,15 @@
   </script>
 
 <script>
-  window.addEventListener("pagehide", () => {
-    sessionStorage.setItem("scrollPos:" + location.href, String(window.scrollY));
-  });
+  // Save scroll position continuously (debounced) so it's always fresh
+  history.scrollRestoration = "manual";
+  let _scrollSaveTimer;
+  window.addEventListener("scroll", () => {
+    clearTimeout(_scrollSaveTimer);
+    _scrollSaveTimer = setTimeout(() => {
+      sessionStorage.setItem("scrollPos:" + location.href, String(window.scrollY));
+    }, 200);
+  }, { passive: true });
 </script>
 </body>
 </html>

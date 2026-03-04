@@ -427,7 +427,7 @@
       // Restore scroll if user navigated back
       const savedScroll = sessionStorage.getItem("scrollPos:" + location.href);
       if (savedScroll) {
-        requestAnimationFrame(() => window.scrollTo(0, Number(savedScroll)));
+        setTimeout(() => { window.scrollTo(0, Number(savedScroll)); }, 300);
         sessionStorage.removeItem("scrollPos:" + location.href);
       }
     }
@@ -436,9 +436,14 @@
   </script>
 
 <script>
-  window.addEventListener("pagehide", () => {
-    sessionStorage.setItem("scrollPos:" + location.href, String(window.scrollY));
-  });
+  history.scrollRestoration = "manual";
+  let _scrollSaveTimer;
+  window.addEventListener("scroll", () => {
+    clearTimeout(_scrollSaveTimer);
+    _scrollSaveTimer = setTimeout(() => {
+      sessionStorage.setItem("scrollPos:" + location.href, String(window.scrollY));
+    }, 200);
+  }, { passive: true });
 </script>
 </body>
 </html>

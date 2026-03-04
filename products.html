@@ -704,7 +704,7 @@
       try {
         const saved = JSON.parse(sessionStorage.getItem("scrollState:" + location.href) || "null");
         if (saved && saved.scrollY) {
-          requestAnimationFrame(() => window.scrollTo(0, saved.scrollY));
+          setTimeout(() => { window.scrollTo(0, saved.scrollY); }, 300);
           sessionStorage.removeItem("scrollState:" + location.href);
         }
       } catch(e) {}
@@ -763,10 +763,17 @@
 </script>
 
 <script>
-  // Save scroll + pagination state when leaving this page so we can restore it on back navigation
-  window.addEventListener("pagehide", () => {
-    sessionStorage.setItem("scrollState:" + location.href, JSON.stringify({ scrollY: window.scrollY, offset }));
-  });
+  // Save scroll + offset state continuously so it's always up to date
+  history.scrollRestoration = "manual";
+  let _scrollSaveTimer;
+  window.addEventListener("scroll", () => {
+    clearTimeout(_scrollSaveTimer);
+    _scrollSaveTimer = setTimeout(() => {
+      try {
+        sessionStorage.setItem("scrollState:" + location.href, JSON.stringify({ scrollY: window.scrollY, offset }));
+      } catch(e) {}
+    }, 200);
+  }, { passive: true });
 </script>
 
 </body>
