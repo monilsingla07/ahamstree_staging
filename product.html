@@ -23,7 +23,7 @@
   <div id="header"></div>
 
   <div class="container">
-    <a href="products.html">← Back to products</a>
+    <div id="breadcrumb-slot"></div>
     <div id="status" class="small" style="margin-top:12px;">Loading…</div>
 
     <div id="content" style="display:none;">
@@ -222,9 +222,54 @@
 
       const lbZoomHint = document.getElementById("lb-zoom-hint");
 
+      // ── Breadcrumb ──
+      (function renderBreadcrumb() {
+        const from = params.get("from") || "";
+        const type = (params.get("type") || "saree").toLowerCase();
+        const colSlug = params.get("col") || "";
+        const colName = params.get("colName") || "";
+        let href, label, trail;
+
+        if (from === "sale") {
+          href = "sale.html"; label = "Sale"; trail = "Sale";
+        } else if (from === "new-arrivals") {
+          href = "new-arrivals.html"; label = "New Arrivals"; trail = "New Arrivals";
+        } else if (from === "collection" && colName) {
+          href = `collection.html?slug=${encodeURIComponent(colSlug)}`; label = colName; trail = "Collection";
+        } else if (type === "suit") {
+          href = "products.html?type=suit"; label = "All Handloom Suits"; trail = "Suits";
+        } else {
+          href = "products.html?type=saree"; label = "All Handloom Sarees"; trail = "Sarees";
+        }
+
+        document.getElementById("breadcrumb-slot").innerHTML =
+          `<a class="page-breadcrumb" href="${href}">
+             <span class="bc-arrow">&#8592;</span>
+             <span class="bc-trail">${trail} /</span>
+             <span class="bc-label">${label}</span>
+           </a>`;
+      })();
+
+      // ── Lightbox zoom + drag-to-pan ──
+      let isZoomed = false;
+      let isDragging = false;
+      let dragStart = { x: 0, y: 0 };
+      let pan = { x: 0, y: 0 };
+      const ZOOM_SCALE = 2.4;
+
+      function applyTransform() {
+        if (isZoomed) {
+          lightboxImg.style.transform = `scale(${ZOOM_SCALE}) translate(${pan.x / ZOOM_SCALE}px, ${pan.y / ZOOM_SCALE}px)`;
+        } else {
+          lightboxImg.style.transform = "";
+        }
+      }
+
       function resetZoom() {
-        lightboxImg.classList.remove("lb-zoomed");
-        if (lbZoomHint) lbZoomHint.style.display = "";
+        isZoomed = false; isDragging = false; pan = { x: 0, y: 0 };
+        lightboxImg.classList.remove("lb-zoomed", "lb-dragging");
+        applyTransform();
+        if (lbZoomHint) lbZoomHint.style.opacity = "1";
       }
 
       function openLightbox(idx) {
@@ -258,11 +303,49 @@
         resetZoom();
       }
 
-      // Double-click to zoom in/out on the lightbox image
-      lightboxImg.addEventListener("dblclick", () => {
-        lightboxImg.classList.toggle("lb-zoomed");
-        if (lbZoomHint) lbZoomHint.style.display = "none";
+      // Double-click to toggle zoom
+      lightboxImg.addEventListener("dblclick", (e) => {
+        e.stopPropagation();
+        isZoomed = !isZoomed;
+        pan = { x: 0, y: 0 };
+        lightboxImg.classList.toggle("lb-zoomed", isZoomed);
+        applyTransform();
+        if (lbZoomHint) lbZoomHint.style.opacity = "0";
       });
+
+      // Mouse drag-to-pan when zoomed
+      lightboxImg.addEventListener("mousedown", (e) => {
+        if (!isZoomed) return;
+        isDragging = true;
+        dragStart = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+        lightboxImg.classList.add("lb-dragging");
+        e.preventDefault();
+      });
+      document.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+        pan = { x: e.clientX - dragStart.x, y: e.clientY - dragStart.y };
+        applyTransform();
+      });
+      document.addEventListener("mouseup", () => {
+        if (!isDragging) return;
+        isDragging = false;
+        lightboxImg.classList.remove("lb-dragging");
+      });
+
+      // Touch drag-to-pan when zoomed
+      lightboxImg.addEventListener("touchstart", (e) => {
+        if (!isZoomed || e.touches.length !== 1) return;
+        isDragging = true;
+        dragStart = { x: e.touches[0].clientX - pan.x, y: e.touches[0].clientY - pan.y };
+        e.preventDefault();
+      }, { passive: false });
+      document.addEventListener("touchmove", (e) => {
+        if (!isDragging || e.touches.length !== 1) return;
+        pan = { x: e.touches[0].clientX - dragStart.x, y: e.touches[0].clientY - dragStart.y };
+        applyTransform();
+        e.preventDefault();
+      }, { passive: false });
+      document.addEventListener("touchend", () => { isDragging = false; });
 
       // Clicking main image opens lightbox
       mainImg.addEventListener("click", () => {

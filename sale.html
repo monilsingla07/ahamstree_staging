@@ -315,10 +315,7 @@
 
       return `
         <div class="p-card" style="animation-delay:${(idx % 8) * 60}ms">
-          <a href="product.html?id=${encodeURIComponent(p.id)}">
-            <div class="p-card-img">
-              ${imgHtml}
-              ${badge ? `<div class="p-card-badge sale-badge">${escapeHtml(badge)}</div>` : ""}
+          <a href="product.html?id=${encodeURIComponent(p.id)}&from=sale">
               ${soldOut ? `<div class="p-card-sold-overlay"><span class="p-card-sold-label">Sold Out</span></div>` : ""}
             </div>
             <div class="p-card-body">
