@@ -848,8 +848,9 @@ body.no-scroll {
   cursor: zoom-in;
   user-select: none; -webkit-user-select: none;
   will-change: transform;
+  touch-action: manipulation; /* prevents browser double-tap zoom so we can handle it ourselves */
 }
-#lightboxImg.lb-zoomed { cursor: grab; }
+#lightboxImg.lb-zoomed { cursor: grab; touch-action: none; } /* none = we handle all touch */
 #lightboxImg.lb-dragging { cursor: grabbing !important; }
 #lb-zoom-hint {
   position: absolute; bottom: -28px; left: 50%; transform: translateX(-50%);
@@ -872,6 +873,8 @@ body.no-scroll {
   text-decoration: none;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
   cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
 }
 .page-breadcrumb:hover {
   background: var(--brand-light);
@@ -880,7 +883,7 @@ body.no-scroll {
 }
 .page-breadcrumb .bc-arrow {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px;
+  width: 22px; height: 22px; flex-shrink: 0;
   background: var(--brand-light);
   border-radius: 50%;
   font-size: 14px; line-height: 1;
@@ -892,8 +895,16 @@ body.no-scroll {
 }
 .page-breadcrumb .bc-trail {
   color: var(--text-light); font-size: 11px; opacity: 0.7; margin-right: 2px;
+  white-space: nowrap;
 }
-.page-breadcrumb .bc-label { color: inherit; }
+.page-breadcrumb .bc-label {
+  color: inherit;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .page-breadcrumb { font-size: 12px; padding: 6px 12px 6px 8px; }
+  .page-breadcrumb .bc-trail { display: none; }
+}
 .lb-btn {
   position: absolute; top: 10px;
   padding: 10px 12px; border-radius: 999px;
