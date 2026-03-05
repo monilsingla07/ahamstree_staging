@@ -177,9 +177,6 @@ export function renderHeader(active = "") {
 
         <!-- Desktop: Left nav -->
         <nav class="nav nav-desktop">
-          <a href="index.html" class="site-logo" aria-label="Ahamstree home">
-            <img src="assets/images/ahamstree-logo.png" alt="Ahamstree" decoding="async">
-          </a>
           <a href="products.html?type=saree" class="${(active === "products" || active === "sarees") ? "active" : ""}">Handloom Sarees</a>
           <a href="products.html?type=suit" class="${active === "suits" ? "active" : ""}">Handloom Suits</a>
           <a href="new-arrivals.html">New Arrivals</a>
@@ -187,6 +184,11 @@ export function renderHeader(active = "") {
           <a href="sale.html">Sale</a>
           <a href="blogs.html">Blogs</a>
         </nav>
+
+        <!-- Desktop: Center logo -->
+        <a href="index.html" class="site-logo-center" aria-label="Ahamstree home">
+          <img src="assets/images/ahamstree-logo.png" alt="Ahamstree" decoding="async">
+        </a>
 
         <!-- Desktop: Right utilities -->
         <div class="utils utils-desktop">
