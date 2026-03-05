@@ -340,7 +340,6 @@ hr { border: none; border-top: 1px solid var(--border-light); margin: 20px 0; }
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  position: relative;
 }
 
 /* Mobile header */
@@ -505,16 +504,14 @@ body.no-scroll {
 .nav-desktop { grid-column: 1; }
 .utils-desktop { grid-column: 3; justify-self: end; }
 
-/* Desktop center logo — absolutely centered so it ignores left/right column widths */
+/* Desktop center logo */
 .site-logo-center {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
   text-decoration: none;
-  z-index: 1;
+  grid-column: 2;
+  justify-self: center;
 }
 .site-logo-center img {
   height: 52px;
