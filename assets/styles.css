@@ -384,39 +384,47 @@ hr { border: none; border-top: 1px solid var(--border-light); margin: 20px 0; }
 
 /* Mobile drawer */
 .mobile-drawer {
-  osition: fixed;
+  position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.45);
+  background: rgba(0,0,0,0);
   display: none;
-  z-index: 3000; /* was 200 — put it above the fixed header */
+  z-index: 3000;
   min-height: 100dvh;
   min-height: -webkit-fill-available;
-
-  /* optional but nice: makes the panel layout reliable */
   justify-content: flex-start;
+  transition: background 0.28s ease;
 }
-.mobile-drawer.open { 
-  display: flex;  /* was block */
+.mobile-drawer.open {
+  display: flex;
+  animation: drawerFadeIn 0.28s ease forwards;
+}
+@keyframes drawerFadeIn {
+  from { background: rgba(0,0,0,0); }
+  to   { background: rgba(0,0,0,0.55); }
 }
 .mobile-drawer-panel {
   height: 100dvh;
   min-height: -webkit-fill-available;
   width: 84%;
-  max-width: 340px;
-
-  /* ✅ THIS is the missing bit */
-  background: rgba(255,255,255,0.98); /* or use: var(--surface) */
+  max-width: 320px;
+  background: #fff;
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-
   padding: 18px 16px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 8px 0 40px rgba(0,0,0,0.18);
   overflow-y: auto;
+  transform: translateX(-100%);
+  animation: none;
+}
+.mobile-drawer.open .mobile-drawer-panel {
+  animation: drawerSlideIn 0.28s cubic-bezier(0.4,0,0.2,1) forwards;
+}
+@keyframes drawerSlideIn {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
 }
 body.no-scroll {
   overflow: hidden;
-  position: fixed; /* required for iOS Safari to actually stop scroll */
-  width: 100%;
 }
 .mobile-drawer-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -430,20 +438,29 @@ body.no-scroll {
 }
 .mobile-drawer-links a,
 .mobile-drawer-section a {
-  display: block;
-  padding: 10px 10px;
+  display: flex;
+  align-items: center;
+  padding: 11px 10px;
   border-radius: var(--radius-sm);
   text-decoration: none;
   color: var(--text);
   font-weight: 500;
   font-size: 15px;
   transition: all 0.14s ease;
+  border-left: 2px solid transparent;
 }
 .mobile-drawer-links a:hover,
 .mobile-drawer-section a:hover {
   background: var(--brand-light);
   color: var(--brand);
-  padding-left: 14px;
+  padding-left: 16px;
+  border-left-color: var(--brand);
+}
+.mobile-drawer-links a.active {
+  color: var(--brand);
+  font-weight: 600;
+  background: var(--brand-lighter);
+  border-left-color: var(--brand);
 }
 .mobile-drawer-section { margin-top: 14px; border-top: 1px solid var(--border-light); padding-top: 12px; }
 .mobile-drawer-section-title {
@@ -721,6 +738,9 @@ body.no-scroll {
   .hero-slide { min-height: 290px; }
   .hero-title { font-size: 28px; }
   .hero-overlay { padding: 30px 14px; }
+  .hero-dot { width: 10px; height: 10px; }
+  .hero-dot[aria-current='true'] { width: 28px; }
+  .hero-dots { padding: 14px 0; gap: 10px; }
 }
 
 /* Float badges */
@@ -808,7 +828,7 @@ body.no-scroll {
    FLOATING CTA
 ═══════════════════════════ */
 .floating-cta {
-  position: fixed; right: 18px; bottom: 18px; z-index: 40;
+  position: fixed; right: 18px; bottom: 18px; z-index: 500;
   display: inline-flex; align-items: center; gap: 10px;
   padding: 11px 16px; border-radius: 999px;
   text-decoration: none; color: var(--text);
@@ -1255,6 +1275,17 @@ body.no-scroll {
   #couponBox .row .input, #couponBox .row button { width: 100%; }
   #summary .row { flex-direction: column; gap: 8px; }
   #summary .row .btn, #summary .row a { width: 100%; text-align: center; }
+}
+
+/* ═══════════════════════════
+   SAFE AREA (iPhone notch/home bar)
+═══════════════════════════ */
+.mobile-drawer-panel {
+  padding-bottom: max(18px, env(safe-area-inset-bottom));
+}
+.floating-cta {
+  bottom: max(18px, calc(env(safe-area-inset-bottom) + 10px));
+  right: max(18px, env(safe-area-inset-right));
 }
 
 /* ═══════════════════════════
