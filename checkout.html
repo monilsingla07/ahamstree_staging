@@ -110,6 +110,45 @@
 
         <div style="height:18px;"></div>
 
+        <!-- Account Panel (shown only for guests) -->
+        <div id="accountPanel" style="display:none; margin-bottom:18px; border:1.5px solid var(--border); border-radius:14px; overflow:hidden;">
+          <div style="background:var(--bg-warm); padding:12px 14px; border-bottom:1px solid var(--border);">
+            <div style="font-weight:800; font-size:13px;">Save your details for next time</div>
+            <div class="small" style="opacity:.7; margin-top:2px;">Required to pay online. Optional for Cash on Delivery.</div>
+          </div>
+          <div style="padding:14px; display:flex; flex-direction:column; gap:8px;">
+            <label id="acctGuestLabel" style="display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:2px solid var(--border); border-radius:10px; cursor:pointer; background:#fff; transition:all .15s;">
+              <input type="radio" name="acct_mode" value="guest" id="acctGuest" checked style="margin-top:2px; accent-color:var(--brand);" />
+              <div>
+                <div style="font-weight:800; font-size:13px;">Continue as Guest</div>
+                <div class="small" style="opacity:.7; margin-top:1px;">Cash on Delivery only. Your details won't be saved.</div>
+              </div>
+            </label>
+            <label id="acctLoginLabel" style="display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:2px solid var(--border); border-radius:10px; cursor:pointer; background:#fff; transition:all .15s;">
+              <input type="radio" name="acct_mode" value="login" id="acctLogin" style="margin-top:2px; accent-color:var(--brand);" />
+              <div>
+                <div style="font-weight:800; font-size:13px;">Log into existing account</div>
+                <div class="small" style="opacity:.7; margin-top:1px;">Access saved address and pay online or COD.</div>
+              </div>
+            </label>
+            <label id="acctCreateLabel" style="display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:2px solid var(--border); border-radius:10px; cursor:pointer; background:#fff; transition:all .15s;">
+              <input type="radio" name="acct_mode" value="create" id="acctCreate" style="margin-top:2px; accent-color:var(--brand);" />
+              <div style="flex:1;">
+                <div style="font-weight:800; font-size:13px;">Create an account</div>
+                <div class="small" style="opacity:.7; margin-top:1px;">Save your details and pay online or COD.</div>
+                <div id="acctCreateFields" style="display:none; margin-top:10px;">
+                  <input class="input" id="acctPassword" type="password" placeholder="Choose a password (min 8 chars)" autocomplete="new-password" style="margin-bottom:6px;" />
+                  <div id="acctCreateMsg" class="small" style="min-height:16px;color:crimson;"></div>
+                </div>
+              </div>
+            </label>
+          </div>
+          <div id="acctActionRow" style="display:none; padding:0 14px 14px;">
+            <button type="button" id="acctActionBtn" class="btn" style="width:100%;">Continue</button>
+            <div id="acctActionMsg" class="small" style="margin-top:8px;min-height:16px;"></div>
+          </div>
+        </div>
+
         <!-- Payment Method Selector -->
         <div style="margin-bottom:14px;">
           <div class="small" style="font-weight:800; margin-bottom:8px;">Payment method</div>
@@ -711,6 +750,76 @@
         if (loginHint) {
           loginHint.innerHTML = `<a href="login.html?next=checkout.html" style="color:var(--brand);font-weight:700;">Log in</a> to use your saved address.`;
         }
+
+        // Show account panel for guests
+        const panel = document.getElementById("accountPanel");
+        if (panel) {
+          panel.style.display = "block";
+
+          const radios = panel.querySelectorAll("input[name='acct_mode']");
+          const labels = { guest: document.getElementById("acctGuestLabel"), login: document.getElementById("acctLoginLabel"), create: document.getElementById("acctCreateLabel") };
+          const createFields = document.getElementById("acctCreateFields");
+          const acctActionRow = document.getElementById("acctActionRow");
+          const acctActionBtn = document.getElementById("acctActionBtn");
+          const acctActionMsg = document.getElementById("acctActionMsg");
+          const pmRazorpayEl  = document.getElementById("pmRazorpay");
+          const pmRazorpayLbl = document.getElementById("pmRazorpayLabel");
+
+          function updateAccountUI() {
+            const val = panel.querySelector("input[name='acct_mode']:checked")?.value || "guest";
+            Object.values(labels).forEach(l => { if (l) { l.style.border = "2px solid var(--border)"; l.style.background = "#fff"; } });
+            if (labels[val]) { labels[val].style.border = "2px solid var(--brand)"; labels[val].style.background = "var(--brand-light)"; }
+
+            if (createFields) createFields.style.display = val === "create" ? "block" : "none";
+            acctActionRow.style.display = val !== "guest" ? "block" : "none";
+            acctActionBtn.textContent   = val === "login" ? "Log in →" : "Create account →";
+
+            // Disable online payment for guests
+            if (pmRazorpayEl) pmRazorpayEl.disabled = val === "guest";
+            if (pmRazorpayLbl) pmRazorpayLbl.style.opacity = val === "guest" ? ".45" : "1";
+            if (val === "guest") {
+              document.getElementById("pmCod")?.click();
+            }
+          }
+
+          radios.forEach(r => r.addEventListener("change", updateAccountUI));
+          updateAccountUI();
+
+          acctActionBtn?.addEventListener("click", async () => {
+            const val  = panel.querySelector("input[name='acct_mode']:checked")?.value;
+            if (val === "login") {
+              sessionStorage.setItem("ahamstree_checkout_return", "1");
+              window.location.href = "login.html?next=checkout.html";
+              return;
+            }
+            if (val === "create") {
+              const pw = document.getElementById("acctPassword")?.value || "";
+              const msg = document.getElementById("acctCreateMsg");
+              if (pw.length < 8) { if (msg) msg.textContent = "Password must be at least 8 characters."; return; }
+              const emailEl = document.querySelector("[name='email']");
+              const email   = emailEl?.value?.trim() || "";
+              if (!email) { if (msg) msg.textContent = "Please enter your email above first."; return; }
+              if (msg) msg.textContent = "";
+              acctActionBtn.disabled = true;
+              acctActionBtn.textContent = "Creating…";
+              acctActionMsg.textContent = "";
+              try {
+                const sbM = await import("./assets/supabase.js");
+                const { error: signUpErr } = await sbM.supabase.auth.signUp({ email, password: pw });
+                if (signUpErr) { acctActionMsg.textContent = signUpErr.message; return; }
+                acctActionMsg.textContent = "✅ Account created. You can now pay online or COD.";
+                panel.style.display = "none";
+                if (pmRazorpayEl) pmRazorpayEl.disabled = false;
+                if (pmRazorpayLbl) pmRazorpayLbl.style.opacity = "1";
+              } catch(e) {
+                acctActionMsg.textContent = e.message || "Could not create account.";
+              } finally {
+                acctActionBtn.disabled = false;
+                acctActionBtn.textContent = "Create account →";
+              }
+            }
+          });
+        }
         return;
       }
 
@@ -998,6 +1107,29 @@
           if (error) { showError(error.message || "Could not place COD order. Please try again."); return; }
 
           const orderId = data?.order_id || data?.id || "";
+          
+          // Save full order snapshot so success page can show provisional invoice
+          try {
+            const cartMod2 = await import("./assets/cart.js");
+            const cartItems = cartMod2.getCart?.() || [];
+            const snapshot = {
+              order_id:    orderId,
+              method:      "cod",
+              name:        shipping.full_name,
+              phone:       shipping.phone,
+              email:       shipping.email || "",
+              address:     [shipping.address_line1, shipping.address_line2, shipping.city, shipping.state, shipping.pincode].filter(Boolean).join(", "),
+              coupon:      appliedCoupon || "",
+              subtotal:    document.getElementById("subtotal")?.textContent || "",
+              discount:    document.getElementById("discount")?.textContent || "",
+              shipping_amt:document.getElementById("shipping")?.textContent || "",
+              total:       document.getElementById("total")?.textContent || "",
+              items:       cartItems.map(i => ({ product_id: i.product_id, title: i.title || "", qty: i.qty, price: i.price_inr || 0, image_url: i.image_url || "" })),
+              placed_at:   new Date().toISOString(),
+            };
+            sessionStorage.setItem("ahamstree_cod_snapshot", JSON.stringify(snapshot));
+          } catch(_) {}
+
           cartMod.clearCart?.();
           statusEl.textContent = "Order placed! Redirecting…";
           window.location.href = "success.html" + (orderId
