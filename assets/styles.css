@@ -698,14 +698,103 @@ body.no-scroll {
   overflow: hidden;
 }
 
-/* Image fills entire slide */
+/* ── Per-slide backgrounds ── */
+.hero-slide[data-slide='1'] {
+  background:
+    radial-gradient(ellipse 55% 75% at 72% 38%, rgba(201,169,110,0.18) 0%, transparent 58%),
+    radial-gradient(ellipse 40% 55% at 18% 72%, rgba(122,28,46,0.22) 0%, transparent 52%),
+    linear-gradient(135deg, #0c0f22 0%, #1a1f3c 50%, #0e1826 100%);
+}
+.hero-slide[data-slide='2'] {
+  background:
+    radial-gradient(ellipse 65% 65% at 62% 32%, rgba(201,169,110,0.2) 0%, transparent 52%),
+    radial-gradient(ellipse 45% 55% at 8% 80%, rgba(26,31,60,0.35) 0%, transparent 55%),
+    linear-gradient(150deg, #3b0913 0%, #7a1c2e 42%, #481020 78%, #1c0c0a 100%);
+}
+.hero-slide[data-slide='3'] {
+  background:
+    radial-gradient(ellipse 60% 60% at 28% 58%, rgba(107,78,148,0.2) 0%, transparent 52%),
+    radial-gradient(ellipse 45% 45% at 82% 18%, rgba(201,169,110,0.14) 0%, transparent 52%),
+    linear-gradient(155deg, #040d11 0%, #0d2833 38%, #1b4d5c 68%, #091e29 100%);
+}
+
+/* Grain texture overlay */
+.hero-slide::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.055'/%3E%3C/svg%3E");
+  opacity: 0.5;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Woven thread pattern */
+.hero-slide::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(0deg,   transparent, transparent 11px, rgba(255,255,255,0.018) 11px, rgba(255,255,255,0.018) 12px),
+    repeating-linear-gradient(90deg,  transparent, transparent 11px, rgba(255,255,255,0.018) 11px, rgba(255,255,255,0.018) 12px);
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Decorative glow orb — slide 1 */
+.hero-slide[data-slide='1'] .hero-deco {
+  position: absolute;
+  right: 7%;
+  top: 50%;
+  transform: translateY(-50%);
+  width: min(380px, 34vw);
+  aspect-ratio: 3/4;
+  border: 1px solid rgba(201,169,110,0.28);
+  z-index: 2;
+  pointer-events: none;
+}
+.hero-slide[data-slide='1'] .hero-deco::before {
+  content: '';
+  position: absolute;
+  inset: 14px;
+  border: 1px solid rgba(201,169,110,0.14);
+}
+/* Dot grid deco — slide 2 */
+.hero-slide[data-slide='2'] .hero-deco {
+  position: absolute;
+  left: -6%;
+  top: 0; bottom: 0;
+  width: 52%;
+  background: repeating-linear-gradient(
+    -52deg,
+    transparent, transparent 20px,
+    rgba(255,255,255,0.022) 20px, rgba(255,255,255,0.022) 21px
+  );
+  z-index: 2;
+  pointer-events: none;
+}
+/* Dot matrix — slide 3 */
+.hero-slide[data-slide='3'] .hero-deco {
+  position: absolute;
+  right: 4%;
+  bottom: 8%;
+  width: 180px; height: 180px;
+  background-image: radial-gradient(circle, rgba(201,169,110,0.38) 1px, transparent 1px);
+  background-size: 17px 17px;
+  mask-image: radial-gradient(ellipse at center, black 35%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse at center, black 35%, transparent 75%);
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Image fills entire slide (kept for when images are added later) */
 .hero-media {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   display: block;
-  z-index: 0;
+  z-index: 3;
 }
 .hero-media img {
   width: 100%;
@@ -715,22 +804,22 @@ body.no-scroll {
   display: block;
 }
 
-/* Gradient scrim — bottom-heavy + left-heavy so text is always readable */
-.hero-slide::after {
-  content: "";
-  position: absolute;
+/* Bottom-heavy scrim over image (only applies when image is present) */
+.hero-media + .hero-overlay::before {
+  content: '';
+  position: fixed;
   inset: 0;
   background:
-    linear-gradient(to top,  rgba(8,4,2,0.90) 0%, rgba(8,4,2,0.25) 45%, transparent 100%),
+    linear-gradient(to top, rgba(8,4,2,0.90) 0%, rgba(8,4,2,0.25) 45%, transparent 100%),
     linear-gradient(to right, rgba(8,4,2,0.55) 0%, transparent 55%);
-  z-index: 1;
+  z-index: -1;
   pointer-events: none;
 }
 
 /* Text overlay — anchored to bottom-left */
 .hero-overlay {
   position: absolute;
-  z-index: 2;
+  z-index: 5;
   bottom: 12%;
   left: max(48px, 6vw);
   max-width: 600px;
